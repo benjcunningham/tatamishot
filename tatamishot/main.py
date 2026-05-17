@@ -216,39 +216,29 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
 def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Path) -> None:
     jobs[job_id]["status"] = JobStatus.running
 
-    audio_map = ["-map", "0:v:0", "-map", f"0:a:{req.audio_stream_index}"] if req.audio_stream_index is not None else []
+    audio_map = ["-map", "0:v:0", "-map", f"0:{req.audio_stream_index}"] if req.audio_stream_index is not None else []
 
     if req.fast:
         cmd = [
             "ffmpeg",
-            "-ss",
-            str(req.start),
-            "-to",
-            str(req.end),
-            "-i",
-            file_path,
+            "-ss", str(req.start),
+            "-to", str(req.end),
+            "-i", file_path,
             *audio_map,
-            "-c",
-            "copy",
-            "-y",
-            str(out_path),
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-y", str(out_path),
         ]
     else:
         cmd = [
             "ffmpeg",
-            "-i",
-            file_path,
-            "-ss",
-            str(req.start),
-            "-to",
-            str(req.end),
+            "-i", file_path,
+            "-ss", str(req.start),
+            "-to", str(req.end),
             *audio_map,
-            "-c:v",
-            "libx264",
-            "-c:a",
-            "aac",
-            "-y",
-            str(out_path),
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-y", str(out_path),
         ]
 
     logger.info("clip cmd: %s", " ".join(cmd))

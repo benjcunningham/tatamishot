@@ -707,7 +707,9 @@
           start: markIn,
           end: markOut,
           fast: fastMode.checked,
-          audio_stream_index: audioTrackSelect.value !== '' ? parseInt(audioTrackSelect.value, 10) : null,
+          audio_stream_index: audioTrackRow.classList.contains('hidden')
+            ? (session?.audio_stream_index ?? null)
+            : (audioTrackSelect.value !== '' ? parseInt(audioTrackSelect.value, 10) : null),
         }),
       });
       if (!res.ok) {
