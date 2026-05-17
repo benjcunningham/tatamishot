@@ -216,7 +216,7 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
 def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Path) -> None:
     jobs[job_id]["status"] = JobStatus.running
 
-    audio_map = ["-map", "0:v:0", "-map", f"0:{req.audio_stream_index}"] if req.audio_stream_index is not None else []
+    audio_map = ["-map", "0:v:0", "-map", f"0:a:{req.audio_stream_index}"] if req.audio_stream_index is not None else []
 
     if req.fast:
         cmd = [
