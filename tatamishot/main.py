@@ -76,19 +76,28 @@ async def get_session() -> JSONResponse:
 
     no_cache = {"Cache-Control": "no-store"}
 
+    logger.info("plex sessions count: %d", len(sessions))
+
     if not sessions:
         return JSONResponse({"playing": False}, headers=no_cache)
 
     session = sessions[0]
+    logger.info("plex session type=%s title=%r", session.get("type"), session.get("title"))
 
     file_path: str | None = None
     audio_streams: list[dict[str, Any]] = []
     audio_stream_index: int | None = None
 
-    for media in session.get("Media", []):
-        for part in media.get("Part", []):
-            if not file_path and part.get("file"):
-                file_path = part["file"]
+    for media_idx, media in enumerate(session.get("Media", [])):
+        for part_idx, part in enumerate(media.get("Part", [])):
+            part_file = part.get("file")
+            stream_count = len(part.get("Stream", []))
+            logger.info(
+                "  media[%d].part[%d]: file=%r streams=%d",
+                media_idx, part_idx, part_file, stream_count,
+            )
+            if not file_path and part_file:
+                file_path = part_file
             for stream in part.get("Stream", []):
                 if stream.get("streamType") != 2:
                     continue
@@ -97,9 +106,15 @@ async def get_session() -> JSONResponse:
                     "label": stream.get("displayTitle") or stream.get("title") or f"Track {stream.get('index')}",
                     "selected": bool(stream.get("selected")),
                 }
+                logger.info(
+                    "  audio stream: index=%s label=%r selected=%s",
+                    entry["index"], entry["label"], entry["selected"],
+                )
                 audio_streams.append(entry)
                 if entry["selected"]:
                     audio_stream_index = entry["index"]
+
+    logger.info("resolved file_path=%r audio_stream_index=%r", file_path, audio_stream_index)
 
     view_offset_ms: int = session.get("viewOffset", 0)
 
