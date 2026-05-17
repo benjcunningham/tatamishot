@@ -3,7 +3,7 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
-name = "tatami-shot"
+name = "tatamishot"
 version = "0.1.0"
 description = "Plex frame/clip capture web app"
 repository = "https://github.com/benjcunningham/tatami-shot"

@@ -3,10 +3,11 @@ import logging
 import os
 import subprocess
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -16,14 +17,15 @@ from pydantic import BaseModel
 
 from tatamishot.config import settings
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-jobs: dict[str, dict] = {}
+jobs: dict[str, dict[str, Any]] = {}
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     os.makedirs(settings.output_dir, exist_ok=True)
     yield
 
@@ -48,7 +50,7 @@ class ClipRequest(BaseModel):
     fast: bool = True
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     pending = "pending"
     running = "running"
     done = "done"
@@ -61,7 +63,7 @@ class JobStatus(str, Enum):
 
 
 @app.get("/session")
-async def get_session():
+async def get_session() -> dict[str, Any]:
     """Return the currently active Plex session."""
     async with httpx.AsyncClient() as client:
         try:
@@ -75,7 +77,7 @@ async def get_session():
             )
             resp.raise_for_status()
         except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail=f"Plex unreachable: {exc}")
+            raise HTTPException(status_code=502, detail=f"Plex unreachable: {exc}") from exc
 
     data = resp.json()
     media_container = data.get("MediaContainer", {})
@@ -87,7 +89,7 @@ async def get_session():
     session = sessions[0]
 
     # Resolve the local file path from the first Media > Part entry.
-    file_path: Optional[str] = None
+    file_path: str | None = None
     for media in session.get("Media", []):
         for part in media.get("Part", []):
             if part.get("file"):
@@ -101,7 +103,7 @@ async def get_session():
     return {
         "playing": True,
         "title": session.get("title", "Unknown"),
-        "grandparent_title": session.get("grandparentTitle"),  # show title if TV
+        "grandparent_title": session.get("grandparentTitle"),  # show name for TV episodes
         "year": session.get("year"),
         "thumb": session.get("thumb"),
         "file_path": file_path,
@@ -116,7 +118,7 @@ async def get_session():
 
 
 @app.post("/frame")
-async def extract_frame(req: FrameRequest):
+async def extract_frame(req: FrameRequest) -> FileResponse:
     """Extract a single frame and return it as a JPEG."""
     _validate_path(req.file_path)
 
@@ -125,10 +127,14 @@ async def extract_frame(req: FrameRequest):
 
     cmd = [
         "ffmpeg",
-        "-ss", str(req.timestamp),
-        "-i", req.file_path,
-        "-frames:v", "1",
-        "-q:v", "2",
+        "-ss",
+        str(req.timestamp),
+        "-i",
+        req.file_path,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "2",
         "-y",
         str(out_path),
     ]
@@ -142,8 +148,8 @@ async def extract_frame(req: FrameRequest):
             stderr=asyncio.subprocess.PIPE,
         )
         _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="ffmpeg timed out")
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="ffmpeg timed out") from exc
 
     if proc.returncode != 0:
         raise HTTPException(
@@ -159,34 +165,43 @@ async def extract_frame(req: FrameRequest):
 # ---------------------------------------------------------------------------
 
 
-def _run_clip_ffmpeg(job_id: str, req: ClipRequest, out_path: Path):
+def _run_clip_ffmpeg(job_id: str, req: ClipRequest, out_path: Path) -> None:
     jobs[job_id]["status"] = JobStatus.running
 
     if req.fast:
         cmd = [
             "ffmpeg",
-            "-ss", str(req.start),
-            "-to", str(req.end),
-            "-i", req.file_path,
-            "-c", "copy",
+            "-ss",
+            str(req.start),
+            "-to",
+            str(req.end),
+            "-i",
+            req.file_path,
+            "-c",
+            "copy",
             "-y",
             str(out_path),
         ]
     else:
         cmd = [
             "ffmpeg",
-            "-i", req.file_path,
-            "-ss", str(req.start),
-            "-to", str(req.end),
-            "-c:v", "libx264",
-            "-c:a", "aac",
+            "-i",
+            req.file_path,
+            "-ss",
+            str(req.start),
+            "-to",
+            str(req.end),
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
             "-y",
             str(out_path),
         ]
 
     logger.info("clip cmd: %s", " ".join(cmd))
 
-    result = subprocess.run(cmd, capture_output=True)
+    result = subprocess.run(cmd, capture_output=True, check=False)
     if result.returncode != 0:
         jobs[job_id]["status"] = JobStatus.error
         jobs[job_id]["error"] = result.stderr.decode(errors="replace")[-500:]
@@ -196,7 +211,7 @@ def _run_clip_ffmpeg(job_id: str, req: ClipRequest, out_path: Path):
 
 
 @app.post("/clip")
-async def extract_clip(req: ClipRequest, background_tasks: BackgroundTasks):
+async def extract_clip(req: ClipRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
     """Enqueue a clip extraction job and return a job ID for polling."""
     _validate_path(req.file_path)
 
@@ -218,7 +233,7 @@ async def extract_clip(req: ClipRequest, background_tasks: BackgroundTasks):
 
 
 @app.get("/jobs/{job_id}")
-async def job_status(job_id: str):
+async def job_status(job_id: str) -> dict[str, Any]:
     job = jobs.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -226,7 +241,7 @@ async def job_status(job_id: str):
 
 
 @app.get("/output/{job_id}")
-async def download_output(job_id: str):
+async def download_output(job_id: str) -> FileResponse:
     job = jobs.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -249,13 +264,12 @@ async def download_output(job_id: str):
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
 
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _validate_path(file_path: str):
+def _validate_path(file_path: str) -> None:
     """Minimal guard: path must exist and be a file (server-side check)."""
     if not Path(file_path).is_file():
         raise HTTPException(status_code=422, detail=f"File not found on server: {file_path}")
