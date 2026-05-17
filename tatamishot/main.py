@@ -11,7 +11,7 @@ from typing import Any
 
 import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -54,7 +54,7 @@ class JobStatus(StrEnum):
 
 
 @app.get("/session")
-async def get_session() -> dict[str, Any]:
+async def get_session() -> JSONResponse:
     """Return the currently active Plex session."""
     async with httpx.AsyncClient() as client:
         try:
@@ -74,8 +74,10 @@ async def get_session() -> dict[str, Any]:
     media_container = data.get("MediaContainer", {})
     sessions = media_container.get("Metadata", [])
 
+    no_cache = {"Cache-Control": "no-store"}
+
     if not sessions:
-        return {"playing": False}
+        return JSONResponse({"playing": False}, headers=no_cache)
 
     session = sessions[0]
 
@@ -101,18 +103,21 @@ async def get_session() -> dict[str, Any]:
 
     view_offset_ms: int = session.get("viewOffset", 0)
 
-    return {
-        "playing": True,
-        "title": session.get("title", "Unknown"),
-        "grandparent_title": session.get("grandparentTitle"),
-        "year": session.get("year"),
-        "thumb": session.get("thumb"),
-        "file_path": file_path,
-        "timestamp": view_offset_ms / 1000,
-        "duration": session.get("duration", 0) / 1000,
-        "audio_streams": audio_streams,
-        "audio_stream_index": audio_stream_index,
-    }
+    return JSONResponse(
+        {
+            "playing": True,
+            "title": session.get("title", "Unknown"),
+            "grandparent_title": session.get("grandparentTitle"),
+            "year": session.get("year"),
+            "thumb": session.get("thumb"),
+            "file_path": file_path,
+            "timestamp": view_offset_ms / 1000,
+            "duration": session.get("duration", 0) / 1000,
+            "audio_streams": audio_streams,
+            "audio_stream_index": audio_stream_index,
+        },
+        headers=no_cache,
+    )
 
 
 @app.post("/frame")
