@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -r
 
 WORKDIR /app
 
-RUN pip install poetry==2.1.3 && poetry config virtualenvs.create false
+RUN pip install poetry && poetry config virtualenvs.create false
 
 COPY pyproject.toml poetry.lock* ./
 RUN poetry install --only main --no-root
