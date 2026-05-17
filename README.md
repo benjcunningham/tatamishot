@@ -15,7 +15,9 @@ cp .env.example .env
 | `PLEX_TOKEN` | Your Plex auth token (see below) |
 | `PLEX_URL` | URL of your Plex server — use `http://host.docker.internal:32400` when running via Docker on the same machine as Plex |
 | `OUTPUT_DIR` | Absolute path for ffmpeg output inside the container (default: `/output`) |
-| `MEDIA_DIR` | Absolute path to your media library on the host, mounted read-only into the container |
+| `MEDIA_DIR` | Absolute path to your media library on the host, mounted read-only into the container as `/media` |
+| `MEDIA_DIR_HOST` | Same as `MEDIA_DIR` — the host path prefix Plex returns in file paths (e.g. `/mnt/media`) |
+| `MEDIA_DIR_CONTAINER` | The path where media is mounted inside the container (default: `/media`) |
 
 ### Getting a Plex token
 
@@ -33,6 +35,15 @@ make docker/up
 ```
 
 Logs: `make docker/logs` — Stop: `make docker/down`
+
+After pulling new changes, do a full rebuild:
+
+```bash
+make docker/down
+git pull
+make docker/build
+make docker/up
+```
 
 ## Running locally (without Docker)
 
