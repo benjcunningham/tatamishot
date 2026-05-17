@@ -53,69 +53,102 @@ class JobStatus(StrEnum):
     error = "error"
 
 
+def _selected_audio_ids(session: dict[str, Any]) -> set[str]:
+    ids: set[str] = set()
+    for media in session.get("Media", []):
+        for part in media.get("Part", []):
+            for stream in part.get("Stream", []):
+                if stream.get("streamType") == 2 and stream.get("selected"):
+                    sid = str(stream.get("id", ""))
+                    if sid:
+                        ids.add(sid)
+    return ids
+
+
+def _parse_media_metadata(
+    meta: dict[str, Any], selected_ids: set[str]
+) -> tuple[str | None, list[dict[str, Any]], int | None]:
+    file_path: str | None = None
+    audio_streams: list[dict[str, Any]] = []
+    audio_stream_index: int | None = None
+
+    for media in meta.get("Media", []):
+        for part in media.get("Part", []):
+            if not file_path and part.get("file"):
+                file_path = part["file"]
+            for stream in part.get("Stream", []):
+                if stream.get("streamType") != 2:
+                    continue
+                sid = str(stream.get("id", ""))
+                is_selected = sid in selected_ids or bool(stream.get("selected"))
+                entry: dict[str, Any] = {
+                    "index": stream.get("index"),
+                    "label": stream.get("displayTitle") or stream.get("title") or f"Track {stream.get('index')}",
+                    "selected": is_selected,
+                }
+                audio_streams.append(entry)
+                if is_selected and audio_stream_index is None:
+                    audio_stream_index = entry["index"]
+
+    return file_path, audio_streams, audio_stream_index
+
+
 @app.get("/session")
 async def get_session() -> JSONResponse:
     """Return the currently active Plex session."""
+    plex_headers = {"X-Plex-Token": settings.plex_token, "Accept": "application/json"}
+    no_cache = {"Cache-Control": "no-store"}
+
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(
                 f"{settings.plex_url}/status/sessions",
-                headers={
-                    "X-Plex-Token": settings.plex_token,
-                    "Accept": "application/json",
-                },
+                headers=plex_headers,
                 timeout=5,
             )
             resp.raise_for_status()
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"Plex unreachable: {exc}") from exc
 
-    data = resp.json()
-    media_container = data.get("MediaContainer", {})
-    sessions = media_container.get("Metadata", [])
-
-    no_cache = {"Cache-Control": "no-store"}
-
+    sessions = resp.json().get("MediaContainer", {}).get("Metadata", [])
     logger.info("plex sessions count: %d", len(sessions))
 
     if not sessions:
         return JSONResponse({"playing": False}, headers=no_cache)
 
     session = sessions[0]
-    logger.info("plex session type=%s title=%r", session.get("type"), session.get("title"))
+    logger.info(
+        "plex session type=%s title=%r ratingKey=%s",
+        session.get("type"), session.get("title"), session.get("ratingKey"),
+    )
+
+    selected_ids = _selected_audio_ids(session)
+    logger.info("selected audio stream ids from session: %s", selected_ids)
 
     file_path: str | None = None
     audio_streams: list[dict[str, Any]] = []
     audio_stream_index: int | None = None
 
-    for media_idx, media in enumerate(session.get("Media", [])):
-        for part_idx, part in enumerate(media.get("Part", [])):
-            part_file = part.get("file")
-            stream_count = len(part.get("Stream", []))
-            logger.info(
-                "  media[%d].part[%d]: file=%r streams=%d keys=%s",
-                media_idx, part_idx, part_file, stream_count, sorted(part.keys()),
+    rating_key = session.get("ratingKey")
+    if rating_key:
+        try:
+            meta_resp = await httpx.AsyncClient().get(
+                f"{settings.plex_url}/library/metadata/{rating_key}",
+                headers=plex_headers,
+                timeout=5,
             )
-            if not file_path and part_file:
-                file_path = part_file
-            for stream in part.get("Stream", []):
-                if stream.get("streamType") != 2:
-                    continue
-                logger.info("  raw audio stream keys=%s data=%r", sorted(stream.keys()), stream)
-                entry: dict[str, Any] = {
-                    "index": stream.get("index"),
-                    "label": stream.get("displayTitle") or stream.get("title") or f"Track {stream.get('index')}",
-                    "selected": bool(stream.get("selected")),
-                }
-                logger.info(
-                    "  audio stream: index=%s label=%r selected=%s",
-                    entry["index"], entry["label"], entry["selected"],
-                )
-                audio_streams.append(entry)
-                if entry["selected"]:
-                    audio_stream_index = entry["index"]
+            meta_resp.raise_for_status()
+            meta = meta_resp.json().get("MediaContainer", {}).get("Metadata", [{}])[0]
+        except (httpx.HTTPError, IndexError, KeyError) as exc:
+            logger.warning("failed to fetch library metadata for %s: %s", rating_key, exc)
+            meta = {}
 
-    logger.info("resolved file_path=%r audio_stream_index=%r", file_path, audio_stream_index)
+        file_path, audio_streams, audio_stream_index = _parse_media_metadata(meta, selected_ids)
+
+    logger.info(
+        "resolved file_path=%r audio_streams=%d audio_stream_index=%r",
+        file_path, len(audio_streams), audio_stream_index,
+    )
 
     view_offset_ms: int = session.get("viewOffset", 0)
 
