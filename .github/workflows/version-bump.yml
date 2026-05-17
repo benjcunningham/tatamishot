@@ -3,65 +3,102 @@ name: Version Bump
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  version-bump:
+  version-check:
+    name: Check pyproject.toml exists
     runs-on: ubuntu-latest
-    if: github.event.pull_request.head.commit.author.name != 'github-actions[bot]'
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
     steps:
       - uses: actions/checkout@v6
+      - id: check
+        run: |
+          if [ -f "pyproject.toml" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+  version-bump:
+    name: Automated version bumper
+    runs-on: ubuntu-latest
+    needs: check
+    if: |
+      github.event.pull_request.head.repo.fork != true &&
+      github.event.pull_request.head.commit.author.name != 'GitHub Action' &&
+      needs.check.outputs.exists == 'true'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Get PR information
+        id: pr_info
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "head_ref=$HEAD_REF" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v6
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ steps.pr_info.outputs.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Get base version
-        id: base
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - uses: snok/install-poetry@v1
+
+      - name: Check version
+        id: version_check
         run: |
-          git fetch origin ${{ github.base_ref }}
-          BASE=$(git show origin/${{ github.base_ref }}:pyproject.toml | grep '^version' | head -1 | sed 's/version = "\(.*\)"/\1/')
-          echo "version=$BASE" >> "$GITHUB_OUTPUT"
-
-      - name: Get PR version
-        id: pr
-        run: |
-          PR=$(grep '^version' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          echo "version=$PR" >> "$GITHUB_OUTPUT"
-
-      - name: Validate or auto-bump version
-        run: |
-          BASE="${{ steps.base.outputs.version }}"
-          PR="${{ steps.pr.outputs.version }}"
-
-          compare_versions() {
-            python3 - "$1" "$2" << 'EOF'
-          import sys
-          from packaging.version import Version
-          a, b = Version(sys.argv[1]), Version(sys.argv[2])
-          if a > b:
-              print("decreased")
-          elif a == b:
-              print("same")
-          else:
-              print("increased")
-          EOF
-          }
-
-          RESULT=$(compare_versions "$BASE" "$PR")
-
-          if [ "$RESULT" = "decreased" ]; then
-            echo "Version decreased from $BASE to $PR — failing."
-            exit 1
-          elif [ "$RESULT" = "same" ]; then
-            echo "Version unchanged ($BASE), auto-bumping patch."
-            pip install poetry --quiet
-            poetry version patch
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add pyproject.toml
-            git commit -m "chore: auto-bump patch version"
-            git push
-          else
-            echo "Version bumped from $BASE to $PR — OK."
+          git fetch origin main
+          if ! git cat-file -e origin/main:pyproject.toml 2>/dev/null; then
+            echo "should_bump=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
+          git show origin/main:pyproject.toml > main_pyproject.toml
+
+          CURRENT_VERSION=$(awk '/^\[project\]/{flag=1} flag && /^version =/{print; flag=0}' pyproject.toml | sed -E 's/version = "([^"]*)"/\1/')
+          PREVIOUS_VERSION=$(awk '/^\[project\]/{flag=1} flag && /^version =/{print; flag=0}' main_pyproject.toml | sed -E 's/version = "([^"]*)"/\1/')
+
+          IFS='.' read -r CURRENT_MAJOR CURRENT_MINOR CURRENT_PATCH <<< "${CURRENT_VERSION%%[-+]*}"
+          IFS='.' read -r PREVIOUS_MAJOR PREVIOUS_MINOR PREVIOUS_PATCH <<< "${PREVIOUS_VERSION%%[-+]*}"
+          CURRENT_MAJOR=${CURRENT_MAJOR:-0}; CURRENT_MINOR=${CURRENT_MINOR:-0}; CURRENT_PATCH=${CURRENT_PATCH:-0}
+          PREVIOUS_MAJOR=${PREVIOUS_MAJOR:-0}; PREVIOUS_MINOR=${PREVIOUS_MINOR:-0}; PREVIOUS_PATCH=${PREVIOUS_PATCH:-0}
+
+          if [[ $CURRENT_MAJOR -gt $PREVIOUS_MAJOR ]] || \
+             [[ $CURRENT_MAJOR -eq $PREVIOUS_MAJOR && $CURRENT_MINOR -gt $PREVIOUS_MINOR ]] || \
+             [[ $CURRENT_MAJOR -eq $PREVIOUS_MAJOR && $CURRENT_MINOR -eq $PREVIOUS_MINOR && $CURRENT_PATCH -gt $PREVIOUS_PATCH ]]; then
+            echo "should_bump=false" >> $GITHUB_OUTPUT
+            echo "- $PREVIOUS_VERSION → $CURRENT_VERSION (already bumped)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "should_bump=true" >> $GITHUB_OUTPUT
+            echo "- $PREVIOUS_VERSION = $CURRENT_VERSION (bump needed)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Bump version
+        id: bump
+        if: steps.version_check.outputs.should_bump == 'true'
+        run: |
+          poetry version patch
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add pyproject.toml
+          git commit -m "chore: auto-bump version to fix version_check"
+          SHA=$(git rev-parse HEAD)
+          SHA_SHORT=$(git rev-parse --short HEAD)
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "sha_short=$SHA_SHORT" >> $GITHUB_OUTPUT
+          git push origin HEAD:refs/heads/${{ steps.pr_info.outputs.head_ref }}
+          echo "- bumped to $(poetry version --short) at $SHA_SHORT" >> $GITHUB_STEP_SUMMARY
