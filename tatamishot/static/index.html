@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>TatamiShot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #1a1a1a;
+      --border: #2e2e2e;
+      --accent: #e5a00d;
+      --accent-dim: #a37200;
+      --text: #f0f0f0;
+      --muted: #888;
+      --danger: #e55;
+      --radius: 12px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.4;
+    }
+
+    #app {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+    }
+
+    /* Session card */
+    #session-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #session-card .title {
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    #session-card .meta {
+      font-size: 0.85rem;
+      color: var(--muted);
+      display: flex;
+      gap: 12px;
+    }
+
+    #session-card .timestamp {
+      font-size: 1.4rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+    }
+
+    #session-card.idle .title { color: var(--muted); }
+
+    /* Mode toggle */
+    #mode-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .mode-btn {
+      padding: 18px 10px;
+      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      text-align: center;
+    }
+
+    .mode-btn.active {
+      border-color: var(--accent);
+      background: #2a1e00;
+    }
+
+    .mode-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* Action panels */
+    #frame-panel, #clip-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #frame-panel.visible, #clip-panel.visible {
+      display: flex;
+    }
+
+    /* Clip controls */
+    #clip-markers {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .marker-btn {
+      padding: 20px 10px;
+      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: border-color 0.15s;
+    }
+
+    .marker-btn.set { border-color: var(--accent); }
+
+    .marker-btn .mark-label { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
+    .marker-btn .mark-time { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+
+    #clip-range {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    #clip-range span { color: var(--text); font-weight: 600; }
+
+    #fast-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      padding: 0 4px;
+    }
+
+    #fast-toggle input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+
+    /* Primary action button */
+    .action-btn {
+      width: 100%;
+      padding: 20px;
+      border-radius: var(--radius);
+      border: none;
+      background: var(--accent);
+      color: #000;
+      font-size: 1.15rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .action-btn:active { background: var(--accent-dim); }
+    .action-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+    /* Progress */
+    #progress {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 24px 0;
+    }
+
+    #progress.visible { display: flex; }
+
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #progress p { color: var(--muted); font-size: 0.9rem; }
+
+    /* Output */
+    #output {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #output.visible { display: flex; }
+
+    #output img, #output video {
+      width: 100%;
+      border-radius: var(--radius);
+      background: #000;
+    }
+
+    #output video { max-height: 60vw; }
+
+    .share-btn {
+      width: 100%;
+      padding: 20px;
+      border-radius: var(--radius);
+      border: none;
+      background: #1e3a1e;
+      border: 2px solid #2e5a2e;
+      color: #7ec87e;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .reset-btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    /* Error */
+    #error-msg {
+      display: none;
+      background: #2a0a0a;
+      border: 1px solid var(--danger);
+      border-radius: var(--radius);
+      padding: 14px;
+      color: var(--danger);
+      font-size: 0.85rem;
+    }
+
+    #error-msg.visible { display: block; }
+
+    /* Refresh indicator */
+    #refresh-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="refresh-dot"></div>
+    <h1>TatamiShot</h1>
+  </header>
+
+  <div id="session-card" class="idle">
+    <div class="title" id="session-title">Waiting for Plex…</div>
+    <div class="meta">
+      <span id="session-year"></span>
+    </div>
+    <div class="timestamp" id="session-ts">–:––:––</div>
+  </div>
+
+  <div id="mode-toggle">
+    <button class="mode-btn" id="btn-frame" disabled>🖼 Frame</button>
+    <button class="mode-btn" id="btn-clip" disabled>✂️ Clip</button>
+  </div>
+
+  <!-- Frame panel -->
+  <div id="frame-panel">
+    <button class="action-btn" id="capture-frame-btn">Capture Frame</button>
+  </div>
+
+  <!-- Clip panel -->
+  <div id="clip-panel">
+    <div id="clip-markers">
+      <button class="marker-btn" id="mark-in-btn">
+        <span class="mark-label">MARK IN</span>
+        <span class="mark-time" id="mark-in-time">–:––:––</span>
+      </button>
+      <button class="marker-btn" id="mark-out-btn">
+        <span class="mark-label">MARK OUT</span>
+        <span class="mark-time" id="mark-out-time">–:––:––</span>
+      </button>
+    </div>
+    <div id="clip-range">Tap Mark In and Mark Out to set range</div>
+    <label id="fast-toggle">
+      <input type="checkbox" id="fast-mode" checked />
+      Fast mode (keyframe-accurate, instant)
+    </label>
+    <button class="action-btn" id="capture-clip-btn" disabled>Export Clip</button>
+  </div>
+
+  <!-- Progress -->
+  <div id="progress">
+    <div class="spinner"></div>
+    <p id="progress-msg">Processing…</p>
+  </div>
+
+  <!-- Error -->
+  <div id="error-msg" id="error-display"></div>
+
+  <!-- Output -->
+  <div id="output">
+    <div id="output-media"></div>
+    <button class="share-btn" id="share-btn">⬆ Save / Share</button>
+    <button class="reset-btn" id="reset-btn">Start Over</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  // -------------------------------------------------------------------------
+  // State
+  // -------------------------------------------------------------------------
+  let session = null;       // current plex session data
+  let mode = null;          // 'frame' | 'clip'
+  let markIn = null;        // seconds
+  let markOut = null;       // seconds
+  let outputUrl = null;     // blob URL of final output
+  let outputFilename = null;
+  let pollTimer = null;
+
+  // -------------------------------------------------------------------------
+  // DOM refs
+  // -------------------------------------------------------------------------
+  const sessionCard  = document.getElementById('session-card');
+  const sessionTitle = document.getElementById('session-title');
+  const sessionYear  = document.getElementById('session-year');
+  const sessionTs    = document.getElementById('session-ts');
+  const btnFrame     = document.getElementById('btn-frame');
+  const btnClip      = document.getElementById('btn-clip');
+  const framePanel   = document.getElementById('frame-panel');
+  const clipPanel    = document.getElementById('clip-panel');
+  const markInBtn    = document.getElementById('mark-in-btn');
+  const markOutBtn   = document.getElementById('mark-out-btn');
+  const markInTime   = document.getElementById('mark-in-time');
+  const markOutTime  = document.getElementById('mark-out-time');
+  const clipRange    = document.getElementById('clip-range');
+  const fastMode     = document.getElementById('fast-mode');
+  const captureFrameBtn = document.getElementById('capture-frame-btn');
+  const captureClipBtn  = document.getElementById('capture-clip-btn');
+  const progressEl   = document.getElementById('progress');
+  const progressMsg  = document.getElementById('progress-msg');
+  const errorEl      = document.getElementById('error-msg');
+  const outputEl     = document.getElementById('output');
+  const outputMedia  = document.getElementById('output-media');
+  const shareBtn     = document.getElementById('share-btn');
+  const resetBtn     = document.getElementById('reset-btn');
+
+  // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
+  function fmtTime(secs) {
+    if (secs == null || isNaN(secs)) return '–:––:––';
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = Math.floor(secs % 60);
+    return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.classList.add('visible');
+  }
+
+  function clearError() {
+    errorEl.textContent = '';
+    errorEl.classList.remove('visible');
+  }
+
+  function showProgress(msg) {
+    progressEl.classList.add('visible');
+    progressMsg.textContent = msg || 'Processing…';
+    outputEl.classList.remove('visible');
+    clearError();
+  }
+
+  function hideProgress() {
+    progressEl.classList.remove('visible');
+  }
+
+  // -------------------------------------------------------------------------
+  // Session polling
+  // -------------------------------------------------------------------------
+  async function refreshSession() {
+    try {
+      const res = await fetch('/session');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      session = data;
+      renderSession(data);
+    } catch (e) {
+      console.warn('Session fetch failed:', e);
+    }
+  }
+
+  function renderSession(data) {
+    if (!data.playing) {
+      sessionCard.classList.add('idle');
+      sessionTitle.textContent = 'Nothing playing in Plex';
+      sessionYear.textContent = '';
+      sessionTs.textContent = '–:––:––';
+      btnFrame.disabled = true;
+      btnClip.disabled = true;
+      return;
+    }
+    sessionCard.classList.remove('idle');
+    const displayTitle = data.grandparent_title
+      ? `${data.grandparent_title} – ${data.title}`
+      : data.title;
+    sessionTitle.textContent = displayTitle;
+    sessionYear.textContent = data.year ?? '';
+    sessionTs.textContent = fmtTime(data.timestamp);
+    btnFrame.disabled = false;
+    btnClip.disabled = false;
+  }
+
+  // -------------------------------------------------------------------------
+  // Mode selection
+  // -------------------------------------------------------------------------
+  function setMode(m) {
+    mode = m;
+    btnFrame.classList.toggle('active', m === 'frame');
+    btnClip.classList.toggle('active', m === 'clip');
+    framePanel.classList.toggle('visible', m === 'frame');
+    clipPanel.classList.toggle('visible', m === 'clip');
+    clearError();
+    outputEl.classList.remove('visible');
+    hideProgress();
+  }
+
+  btnFrame.addEventListener('click', () => setMode('frame'));
+  btnClip.addEventListener('click', () => setMode('clip'));
+
+  // -------------------------------------------------------------------------
+  // Mark in / out
+  // -------------------------------------------------------------------------
+  function updateClipState() {
+    markInTime.textContent = fmtTime(markIn);
+    markOutTime.textContent = fmtTime(markOut);
+    markInBtn.classList.toggle('set', markIn !== null);
+    markOutBtn.classList.toggle('set', markOut !== null);
+
+    if (markIn !== null && markOut !== null && markOut > markIn) {
+      const dur = markOut - markIn;
+      clipRange.innerHTML = `<span>${fmtTime(markIn)}</span> → <span>${fmtTime(markOut)}</span> &nbsp;(${dur.toFixed(1)}s)`;
+      captureClipBtn.disabled = false;
+    } else if (markIn !== null && markOut !== null) {
+      clipRange.textContent = 'Mark Out must be after Mark In';
+      captureClipBtn.disabled = true;
+    } else {
+      clipRange.textContent = 'Tap Mark In and Mark Out to set range';
+      captureClipBtn.disabled = true;
+    }
+  }
+
+  markInBtn.addEventListener('click', () => {
+    if (!session?.timestamp) return;
+    markIn = session.timestamp;
+    updateClipState();
+  });
+
+  markOutBtn.addEventListener('click', () => {
+    if (!session?.timestamp) return;
+    markOut = session.timestamp;
+    updateClipState();
+  });
+
+  // -------------------------------------------------------------------------
+  // Frame capture
+  // -------------------------------------------------------------------------
+  captureFrameBtn.addEventListener('click', async () => {
+    if (!session?.file_path) return showError('No active session file path.');
+    clearError();
+    showProgress('Extracting frame…');
+    captureFrameBtn.disabled = true;
+
+    try {
+      const res = await fetch('/frame', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path: session.file_path, timestamp: session.timestamp }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      showOutput(blob, 'frame.jpg', 'image');
+    } catch (e) {
+      showError(`Frame capture failed: ${e.message}`);
+    } finally {
+      hideProgress();
+      captureFrameBtn.disabled = false;
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Clip capture
+  // -------------------------------------------------------------------------
+  captureClipBtn.addEventListener('click', async () => {
+    if (!session?.file_path) return showError('No active session file path.');
+    if (markIn === null || markOut === null || markOut <= markIn) return;
+    clearError();
+    showProgress('Queuing clip…');
+    captureClipBtn.disabled = true;
+
+    try {
+      const res = await fetch('/clip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_path: session.file_path,
+          start: markIn,
+          end: markOut,
+          fast: fastMode.checked,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const { job_id } = await res.json();
+      pollJob(job_id);
+    } catch (e) {
+      showError(`Clip request failed: ${e.message}`);
+      hideProgress();
+      captureClipBtn.disabled = false;
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Job polling
+  // -------------------------------------------------------------------------
+  function pollJob(jobId) {
+    progressMsg.textContent = 'Running ffmpeg…';
+    clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/jobs/${jobId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const job = await res.json();
+
+        if (job.status === 'done') {
+          clearInterval(pollTimer);
+          // Fetch the output file
+          const fileRes = await fetch(`/output/${jobId}`);
+          if (!fileRes.ok) throw new Error('Failed to download output');
+          const blob = await fileRes.blob();
+          showOutput(blob, job.filename || `${jobId}.mp4`, 'video');
+          hideProgress();
+          captureClipBtn.disabled = false;
+        } else if (job.status === 'error') {
+          clearInterval(pollTimer);
+          hideProgress();
+          showError(`ffmpeg error: ${job.error || 'unknown'}`);
+          captureClipBtn.disabled = false;
+        }
+      } catch (e) {
+        clearInterval(pollTimer);
+        hideProgress();
+        showError(`Polling failed: ${e.message}`);
+        captureClipBtn.disabled = false;
+      }
+    }, 1500);
+  }
+
+  // -------------------------------------------------------------------------
+  // Output display
+  // -------------------------------------------------------------------------
+  function showOutput(blob, filename, type) {
+    if (outputUrl) URL.revokeObjectURL(outputUrl);
+    outputUrl = URL.createObjectURL(blob);
+    outputFilename = filename;
+
+    outputMedia.innerHTML = '';
+    if (type === 'image') {
+      const img = document.createElement('img');
+      img.src = outputUrl;
+      img.alt = 'Captured frame';
+      outputMedia.appendChild(img);
+    } else {
+      const video = document.createElement('video');
+      video.src = outputUrl;
+      video.controls = true;
+      video.autoplay = true;
+      video.loop = true;
+      video.playsInline = true;
+      outputMedia.appendChild(video);
+    }
+    outputEl.classList.add('visible');
+  }
+
+  // -------------------------------------------------------------------------
+  // Share / Save
+  // -------------------------------------------------------------------------
+  shareBtn.addEventListener('click', async () => {
+    if (!outputUrl) return;
+    const res = await fetch(outputUrl);
+    const blob = await res.blob();
+    const file = new File([blob], outputFilename, { type: blob.type });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'TatamiShot' });
+        return;
+      } catch (e) {
+        if (e.name !== 'AbortError') console.warn('Share failed:', e);
+      }
+    }
+    // Fallback: plain download
+    const a = document.createElement('a');
+    a.href = outputUrl;
+    a.download = outputFilename;
+    a.click();
+  });
+
+  // -------------------------------------------------------------------------
+  // Reset
+  // -------------------------------------------------------------------------
+  resetBtn.addEventListener('click', () => {
+    if (outputUrl) { URL.revokeObjectURL(outputUrl); outputUrl = null; }
+    outputEl.classList.remove('visible');
+    outputMedia.innerHTML = '';
+    clearError();
+    markIn = null;
+    markOut = null;
+    updateClipState();
+    setMode(mode); // re-show current panel
+  });
+
+  // -------------------------------------------------------------------------
+  // Boot
+  // -------------------------------------------------------------------------
+  refreshSession();
+  setInterval(refreshSession, 5000);
+})();
+</script>
+</body>
+</html>

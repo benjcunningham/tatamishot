@@ -1,0 +1,70 @@
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "tatamishot"
+version = "0.1.0"
+description = "Plex frame/clip capture web app"
+repository = "https://github.com/benjcunningham/tatami-shot"
+requires-python = ">=3.13,<3.14"
+dynamic = [ "dependencies",]
+[[project.authors]]
+name = "Ben Cunningham"
+email = "benjamescunningham@gmail.com"
+
+[tool.poetry]
+[[tool.poetry.source]]
+name = "PyPI"
+priority = "primary"
+
+[tool.isort]
+ensure_newline_before_comments = true
+force_grid_wrap = 0
+include_trailing_comma = true
+known_first_party = [ "tatamishot",]
+known_local_folder = [ "tests", "tests_integration",]
+lines_after_imports = 2
+multi_line_output = 3
+profile = "black"
+use_parentheses = true
+
+[tool.mypy]
+python_version = "3.13"
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.ruff]
+src = [ "tatamishot",]
+extend-exclude = [ "__pycache__", "test-results",]
+target-version = "py313"
+line-length = 120
+
+[tool.ruff.lint]
+select = [ "ANN", "ARG", "ASYNC", "B", "E", "ERA", "F", "I", "N", "PL", "Q", "TC", "UP", "W",]
+ignore = [ "ANN401", "B008", "PLR2004", "PLR6301", "TC006",]
+
+[tool.poetry.dependencies]
+python = "^3.13.13,<3.14"
+aiofiles = "^25.1.0"
+fastapi = "^0.136.1"
+httpx = "^0.28.1"
+pydantic-settings = "^2.14.1"
+uvicorn = { extras = ["standard"], version = "^0.47.0"}
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [ "ARG001", "ARG002", "PLC2701", "PLR0904", "PLR0914", "PLC2701",]
+"tests_integration/**/*.py" = [ "ARG001", "ARG002", "PLC2701",]
+
+[tool.ruff.lint.isort]
+known-first-party = [ "tatamishot",]
+known-local-folder = [ "tests", "tests_integration",]
+lines-after-imports = 2
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0.1"
+pytest-asyncio = "^1.1.0"
+pytest-cov = "^7.0.0"
+ruff = "^0.15.0"
+mypy = "^2.1.0"
