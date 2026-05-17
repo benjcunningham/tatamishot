@@ -29,11 +29,11 @@ jobs:
   version-bump:
     name: Automated version bumper
     runs-on: ubuntu-latest
-    needs: check
+    needs: version-check
     if: |
       github.event.pull_request.head.repo.fork != true &&
       github.event.pull_request.head.commit.author.name != 'GitHub Action' &&
-      needs.check.outputs.exists == 'true'
+      needs.version-check.outputs.exists == 'true'
     permissions:
       contents: write
       pull-requests: write
