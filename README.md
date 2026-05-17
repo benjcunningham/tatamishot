@@ -13,8 +13,9 @@ cp .env.example .env
 | Variable | Description |
 |---|---|
 | `PLEX_TOKEN` | Your Plex auth token (see below) |
-| `PLEX_URL` | URL of your Plex server, e.g. `http://localhost:32400` |
-| `OUTPUT_DIR` | Absolute path for ffmpeg output, e.g. `/home/ben/tatamishot/output` |
+| `PLEX_URL` | URL of your Plex server — use `http://host.docker.internal:32400` when running via Docker on the same machine as Plex |
+| `OUTPUT_DIR` | Absolute path for ffmpeg output inside the container (default: `/output`) |
+| `MEDIA_DIR` | Absolute path to your media library on the host, mounted read-only into the container |
 
 ### Getting a Plex token
 
@@ -24,12 +25,20 @@ On the Pi, find it in the Plex preferences file:
 grep -r "PlexOnlineToken" "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Preferences.xml"
 ```
 
-## Running on the Pi
+## Running with Docker (recommended)
+
+```bash
+make docker/build
+make docker/up
+```
+
+Logs: `make docker/logs` — Stop: `make docker/down`
+
+## Running locally (without Docker)
 
 ```bash
 make install
-mkdir -p output
-poetry run uvicorn tatamishot.main:app --host 0.0.0.0 --port 8484
+make run
 ```
 
 ## Accessing from your phone

@@ -50,6 +50,32 @@ all: ## Helper target to run all checks and tests
 install: ## Install project dependencies using poetry
 	poetry install
 
+.PHONY: run
+run: ## Run the app locally
+	poetry run uvicorn tatamishot.main:app --host 0.0.0.0 --port 8484 --reload
+
+##@ Docker
+
+.PHONY: docker/build
+docker/build: ## Build the Docker image
+	docker compose build
+
+.PHONY: docker/up
+docker/up: ## Start the app via Docker Compose
+	docker compose up -d
+
+.PHONY: docker/down
+docker/down: ## Stop the app via Docker Compose
+	docker compose down
+
+.PHONY: docker/logs
+docker/logs: ## Tail logs from the running container
+	docker compose logs -f
+
+.PHONY: docker/restart
+docker/restart: ## Restart the app container
+	docker compose restart tatamishot
+
 ##@ Local - Testing
 
 .PHONY: test
