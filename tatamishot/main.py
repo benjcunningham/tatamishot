@@ -3,11 +3,14 @@ import logging
 import os
 import subprocess
 import uuid
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException
