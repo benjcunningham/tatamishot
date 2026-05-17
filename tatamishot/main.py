@@ -119,7 +119,9 @@ async def get_session() -> JSONResponse:
     session = sessions[0]
     logger.info(
         "plex session type=%s title=%r ratingKey=%s",
-        session.get("type"), session.get("title"), session.get("ratingKey"),
+        session.get("type"),
+        session.get("title"),
+        session.get("ratingKey"),
     )
 
     selected_ids = _selected_audio_ids(session)
@@ -147,7 +149,9 @@ async def get_session() -> JSONResponse:
 
     logger.info(
         "resolved file_path=%r audio_streams=%d audio_stream_index=%r",
-        file_path, len(audio_streams), audio_stream_index,
+        file_path,
+        len(audio_streams),
+        audio_stream_index,
     )
 
     view_offset_ms: int = session.get("viewOffset", 0)
@@ -221,24 +225,36 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
     if req.fast:
         cmd = [
             "ffmpeg",
-            "-ss", str(req.start),
-            "-to", str(req.end),
-            "-i", file_path,
+            "-ss",
+            str(req.start),
+            "-to",
+            str(req.end),
+            "-i",
+            file_path,
             *audio_map,
-            "-c:v", "copy",
-            "-c:a", "aac",
-            "-y", str(out_path),
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-y",
+            str(out_path),
         ]
     else:
         cmd = [
             "ffmpeg",
-            "-i", file_path,
-            "-ss", str(req.start),
-            "-to", str(req.end),
+            "-i",
+            file_path,
+            "-ss",
+            str(req.start),
+            "-to",
+            str(req.end),
             *audio_map,
-            "-c:v", "libx264",
-            "-c:a", "aac",
-            "-y", str(out_path),
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+            "-y",
+            str(out_path),
         ]
 
     logger.info("clip cmd: %s", " ".join(cmd))
