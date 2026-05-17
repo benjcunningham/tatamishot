@@ -167,23 +167,34 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
     if req.fast:
         cmd = [
             "ffmpeg",
-            "-ss", str(req.start),
-            "-to", str(req.end),
-            "-i", file_path,
+            "-ss",
+            str(req.start),
+            "-to",
+            str(req.end),
+            "-i",
+            file_path,
             *audio_map,
-            "-c", "copy",
-            "-y", str(out_path),
+            "-c",
+            "copy",
+            "-y",
+            str(out_path),
         ]
     else:
         cmd = [
             "ffmpeg",
-            "-i", file_path,
-            "-ss", str(req.start),
-            "-to", str(req.end),
+            "-i",
+            file_path,
+            "-ss",
+            str(req.start),
+            "-to",
+            str(req.end),
             *audio_map,
-            "-c:v", "libx264",
-            "-c:a", "aac",
-            "-y", str(out_path),
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+            "-y",
+            str(out_path),
         ]
 
     logger.info("clip cmd: %s", " ".join(cmd))
@@ -246,7 +257,7 @@ app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True
 def _translate_path(file_path: str) -> str:
     """Rewrite a host media path to its container mount point."""
     if settings.media_dir_host and file_path.startswith(settings.media_dir_host):
-        return settings.media_dir_container + file_path[len(settings.media_dir_host):]
+        return settings.media_dir_container + file_path[len(settings.media_dir_host) :]
     return file_path
 
 
