@@ -33,20 +33,15 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 app = FastAPI(title="TatamiShot", lifespan=lifespan)
 
 
-# ---------------------------------------------------------------------------
-# Models
-# ---------------------------------------------------------------------------
-
-
 class FrameRequest(BaseModel):
     file_path: str
-    timestamp: float  # seconds
+    timestamp: float
 
 
 class ClipRequest(BaseModel):
     file_path: str
-    start: float  # seconds
-    end: float  # seconds
+    start: float
+    end: float
     fast: bool = True
 
 
@@ -55,11 +50,6 @@ class JobStatus(StrEnum):
     running = "running"
     done = "done"
     error = "error"
-
-
-# ---------------------------------------------------------------------------
-# Plex session
-# ---------------------------------------------------------------------------
 
 
 @app.get("/session")
@@ -88,7 +78,6 @@ async def get_session() -> dict[str, Any]:
 
     session = sessions[0]
 
-    # Resolve the local file path from the first Media > Part entry.
     file_path: str | None = None
     for media in session.get("Media", []):
         for part in media.get("Part", []):
@@ -103,18 +92,13 @@ async def get_session() -> dict[str, Any]:
     return {
         "playing": True,
         "title": session.get("title", "Unknown"),
-        "grandparent_title": session.get("grandparentTitle"),  # show name for TV episodes
+        "grandparent_title": session.get("grandparentTitle"),
         "year": session.get("year"),
         "thumb": session.get("thumb"),
         "file_path": file_path,
-        "timestamp": view_offset_ms / 1000,  # seconds
-        "duration": session.get("duration", 0) / 1000,  # seconds
+        "timestamp": view_offset_ms / 1000,
+        "duration": session.get("duration", 0) / 1000,
     }
-
-
-# ---------------------------------------------------------------------------
-# Frame extraction
-# ---------------------------------------------------------------------------
 
 
 @app.post("/frame")
@@ -158,11 +142,6 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
         )
 
     return FileResponse(str(out_path), media_type="image/jpeg", filename=f"{job_id}.jpg")
-
-
-# ---------------------------------------------------------------------------
-# Clip extraction
-# ---------------------------------------------------------------------------
 
 
 def _run_clip_ffmpeg(job_id: str, req: ClipRequest, out_path: Path) -> None:
@@ -227,11 +206,6 @@ async def extract_clip(req: ClipRequest, background_tasks: BackgroundTasks) -> d
     return {"job_id": job_id, "status": JobStatus.pending}
 
 
-# ---------------------------------------------------------------------------
-# Job status + output download
-# ---------------------------------------------------------------------------
-
-
 @app.get("/jobs/{job_id}")
 async def job_status(job_id: str) -> dict[str, Any]:
     job = jobs.get(job_id)
@@ -257,16 +231,7 @@ async def download_output(job_id: str) -> FileResponse:
     return FileResponse(str(out_path), media_type=media_type, filename=filename)
 
 
-# ---------------------------------------------------------------------------
-# Static frontend
-# ---------------------------------------------------------------------------
-
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _validate_path(file_path: str) -> None:
