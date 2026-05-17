@@ -18,7 +18,7 @@ help: ## Display this help message
 					} \
 			}' $(MAKEFILE_LIST)
 
-##@@ Local - Development
+##@ Local - Development
 
 .PHONY: clean
 clean: ## Clean project build artifacts
@@ -69,11 +69,11 @@ version: ## Bump version (default: patch)
 version/minor: ## Bump minor version
 	make version BUMP=minor
 
-.PHONY: version/major:
+.PHONY: version/major
 version/major: ## Bump major version
 	make version BUMP=major
 
-.PHONY: version/push:
+.PHONY: version/push
 version/push: ## Bump version and push to remote repository
 	make version
 	git add pyproject.toml
