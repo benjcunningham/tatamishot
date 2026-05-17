@@ -11,7 +11,7 @@ from typing import Any
 
 import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -43,6 +43,7 @@ class ClipRequest(BaseModel):
     start: float
     end: float
     fast: bool = True
+    audio_stream_index: int | None = None
 
 
 class JobStatus(StrEnum):
@@ -52,53 +53,124 @@ class JobStatus(StrEnum):
     error = "error"
 
 
+def _selected_audio_ids(session: dict[str, Any]) -> set[str]:
+    ids: set[str] = set()
+    for media in session.get("Media", []):
+        for part in media.get("Part", []):
+            for stream in part.get("Stream", []):
+                if stream.get("streamType") == 2 and stream.get("selected"):
+                    sid = str(stream.get("id", ""))
+                    if sid:
+                        ids.add(sid)
+    return ids
+
+
+def _parse_media_metadata(
+    meta: dict[str, Any], selected_ids: set[str]
+) -> tuple[str | None, list[dict[str, Any]], int | None]:
+    file_path: str | None = None
+    audio_streams: list[dict[str, Any]] = []
+    audio_stream_index: int | None = None
+
+    for media in meta.get("Media", []):
+        for part in media.get("Part", []):
+            if not file_path and part.get("file"):
+                file_path = part["file"]
+            for stream in part.get("Stream", []):
+                if stream.get("streamType") != 2:
+                    continue
+                sid = str(stream.get("id", ""))
+                is_selected = sid in selected_ids or bool(stream.get("selected"))
+                entry: dict[str, Any] = {
+                    "index": stream.get("index"),
+                    "label": stream.get("displayTitle") or stream.get("title") or f"Track {stream.get('index')}",
+                    "selected": is_selected,
+                }
+                audio_streams.append(entry)
+                if is_selected and audio_stream_index is None:
+                    audio_stream_index = entry["index"]
+
+    return file_path, audio_streams, audio_stream_index
+
+
 @app.get("/session")
-async def get_session() -> dict[str, Any]:
+async def get_session() -> JSONResponse:
     """Return the currently active Plex session."""
+    plex_headers = {"X-Plex-Token": settings.plex_token, "Accept": "application/json"}
+    no_cache = {"Cache-Control": "no-store"}
+
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(
                 f"{settings.plex_url}/status/sessions",
-                headers={
-                    "X-Plex-Token": settings.plex_token,
-                    "Accept": "application/json",
-                },
+                headers=plex_headers,
                 timeout=5,
             )
             resp.raise_for_status()
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail=f"Plex unreachable: {exc}") from exc
 
-    data = resp.json()
-    media_container = data.get("MediaContainer", {})
-    sessions = media_container.get("Metadata", [])
+    sessions = resp.json().get("MediaContainer", {}).get("Metadata", [])
+    logger.info("plex sessions count: %d", len(sessions))
 
     if not sessions:
-        return {"playing": False}
+        return JSONResponse({"playing": False}, headers=no_cache)
 
     session = sessions[0]
+    logger.info(
+        "plex session type=%s title=%r ratingKey=%s",
+        session.get("type"),
+        session.get("title"),
+        session.get("ratingKey"),
+    )
+
+    selected_ids = _selected_audio_ids(session)
+    logger.info("selected audio stream ids from session: %s", selected_ids)
 
     file_path: str | None = None
-    for media in session.get("Media", []):
-        for part in media.get("Part", []):
-            if part.get("file"):
-                file_path = part["file"]
-                break
-        if file_path:
-            break
+    audio_streams: list[dict[str, Any]] = []
+    audio_stream_index: int | None = None
+
+    rating_key = session.get("ratingKey")
+    if rating_key:
+        try:
+            meta_resp = await httpx.AsyncClient().get(
+                f"{settings.plex_url}/library/metadata/{rating_key}",
+                headers=plex_headers,
+                timeout=5,
+            )
+            meta_resp.raise_for_status()
+            meta = meta_resp.json().get("MediaContainer", {}).get("Metadata", [{}])[0]
+        except (httpx.HTTPError, IndexError, KeyError) as exc:
+            logger.warning("failed to fetch library metadata for %s: %s", rating_key, exc)
+            meta = {}
+
+        file_path, audio_streams, audio_stream_index = _parse_media_metadata(meta, selected_ids)
+
+    logger.info(
+        "resolved file_path=%r audio_streams=%d audio_stream_index=%r",
+        file_path,
+        len(audio_streams),
+        audio_stream_index,
+    )
 
     view_offset_ms: int = session.get("viewOffset", 0)
 
-    return {
-        "playing": True,
-        "title": session.get("title", "Unknown"),
-        "grandparent_title": session.get("grandparentTitle"),
-        "year": session.get("year"),
-        "thumb": session.get("thumb"),
-        "file_path": file_path,
-        "timestamp": view_offset_ms / 1000,
-        "duration": session.get("duration", 0) / 1000,
-    }
+    return JSONResponse(
+        {
+            "playing": True,
+            "title": session.get("title", "Unknown"),
+            "grandparent_title": session.get("grandparentTitle"),
+            "year": session.get("year"),
+            "thumb": session.get("thumb"),
+            "file_path": file_path,
+            "timestamp": view_offset_ms / 1000,
+            "duration": session.get("duration", 0) / 1000,
+            "audio_streams": audio_streams,
+            "audio_stream_index": audio_stream_index,
+        },
+        headers=no_cache,
+    )
 
 
 @app.post("/frame")
@@ -148,6 +220,8 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
 def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Path) -> None:
     jobs[job_id]["status"] = JobStatus.running
 
+    audio_map = ["-map", "0:v:0", "-map", f"0:{req.audio_stream_index}"] if req.audio_stream_index is not None else []
+
     if req.fast:
         cmd = [
             "ffmpeg",
@@ -157,8 +231,11 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
             str(req.end),
             "-i",
             file_path,
-            "-c",
+            *audio_map,
+            "-c:v",
             "copy",
+            "-c:a",
+            "aac",
             "-y",
             str(out_path),
         ]
@@ -171,6 +248,7 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
             str(req.start),
             "-to",
             str(req.end),
+            *audio_map,
             "-c:v",
             "libx264",
             "-c:a",
@@ -239,7 +317,7 @@ app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True
 def _translate_path(file_path: str) -> str:
     """Rewrite a host media path to its container mount point."""
     if settings.media_dir_host and file_path.startswith(settings.media_dir_host):
-        return settings.media_dir_container + file_path[len(settings.media_dir_host):]
+        return settings.media_dir_container + file_path[len(settings.media_dir_host) :]
     return file_path
 
 
