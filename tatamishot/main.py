@@ -43,6 +43,7 @@ class ClipRequest(BaseModel):
     start: float
     end: float
     fast: bool = True
+    audio_stream_index: int | None = None
 
 
 class JobStatus(StrEnum):
@@ -79,13 +80,24 @@ async def get_session() -> dict[str, Any]:
     session = sessions[0]
 
     file_path: str | None = None
+    audio_streams: list[dict[str, Any]] = []
+    audio_stream_index: int | None = None
+
     for media in session.get("Media", []):
         for part in media.get("Part", []):
-            if part.get("file"):
+            if not file_path and part.get("file"):
                 file_path = part["file"]
-                break
-        if file_path:
-            break
+            for stream in part.get("Stream", []):
+                if stream.get("streamType") != 2:
+                    continue
+                entry: dict[str, Any] = {
+                    "index": stream.get("index"),
+                    "label": stream.get("displayTitle") or stream.get("title") or f"Track {stream.get('index')}",
+                    "selected": bool(stream.get("selected")),
+                }
+                audio_streams.append(entry)
+                if entry["selected"]:
+                    audio_stream_index = entry["index"]
 
     view_offset_ms: int = session.get("viewOffset", 0)
 
@@ -98,6 +110,8 @@ async def get_session() -> dict[str, Any]:
         "file_path": file_path,
         "timestamp": view_offset_ms / 1000,
         "duration": session.get("duration", 0) / 1000,
+        "audio_streams": audio_streams,
+        "audio_stream_index": audio_stream_index,
     }
 
 
@@ -148,35 +162,28 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
 def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Path) -> None:
     jobs[job_id]["status"] = JobStatus.running
 
+    audio_map = ["-map", "0:v:0", "-map", f"0:{req.audio_stream_index}"] if req.audio_stream_index is not None else []
+
     if req.fast:
         cmd = [
             "ffmpeg",
-            "-ss",
-            str(req.start),
-            "-to",
-            str(req.end),
-            "-i",
-            file_path,
-            "-c",
-            "copy",
-            "-y",
-            str(out_path),
+            "-ss", str(req.start),
+            "-to", str(req.end),
+            "-i", file_path,
+            *audio_map,
+            "-c", "copy",
+            "-y", str(out_path),
         ]
     else:
         cmd = [
             "ffmpeg",
-            "-i",
-            file_path,
-            "-ss",
-            str(req.start),
-            "-to",
-            str(req.end),
-            "-c:v",
-            "libx264",
-            "-c:a",
-            "aac",
-            "-y",
-            str(out_path),
+            "-i", file_path,
+            "-ss", str(req.start),
+            "-to", str(req.end),
+            *audio_map,
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-y", str(out_path),
         ]
 
     logger.info("clip cmd: %s", " ".join(cmd))
