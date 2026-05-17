@@ -93,14 +93,15 @@ async def get_session() -> JSONResponse:
             part_file = part.get("file")
             stream_count = len(part.get("Stream", []))
             logger.info(
-                "  media[%d].part[%d]: file=%r streams=%d",
-                media_idx, part_idx, part_file, stream_count,
+                "  media[%d].part[%d]: file=%r streams=%d keys=%s",
+                media_idx, part_idx, part_file, stream_count, sorted(part.keys()),
             )
             if not file_path and part_file:
                 file_path = part_file
             for stream in part.get("Stream", []):
                 if stream.get("streamType") != 2:
                     continue
+                logger.info("  raw audio stream keys=%s data=%r", sorted(stream.keys()), stream)
                 entry: dict[str, Any] = {
                     "index": stream.get("index"),
                     "label": stream.get("displayTitle") or stream.get("title") or f"Track {stream.get('index')}",
