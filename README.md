@@ -18,7 +18,11 @@ cp .env.example .env
 
 ### Getting a Plex token
 
-Sign in at plex.tv, then visit `https://plex.tv/users/account` and search the page source for `authToken`.
+On the Pi, find it in the Plex preferences file:
+
+```bash
+grep -r "PlexOnlineToken" "/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Preferences.xml"
+```
 
 ## Running on the Pi
 
