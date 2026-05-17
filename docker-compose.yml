@@ -4,10 +4,9 @@ services:
     ports:
       - "8484:8484"
     volumes:
-      - /path/to/media:/media:ro
+      - ${MEDIA_DIR}:/media:ro
       - ./output:/output
-    environment:
-      - PLEX_TOKEN=your_token_here
-      - PLEX_URL=http://plex:32400
-      - OUTPUT_DIR=/output
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped

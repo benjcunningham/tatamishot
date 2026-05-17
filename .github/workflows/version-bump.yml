@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  version-bump:
+  version-check:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -53,14 +53,8 @@ jobs:
             echo "Version decreased from $BASE to $PR — failing."
             exit 1
           elif [ "$RESULT" = "same" ]; then
-            echo "Version unchanged ($BASE), auto-bumping patch."
-            pip install poetry --quiet
-            poetry version patch
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add pyproject.toml
-            git commit -m "chore: auto-bump patch version"
-            git push
+            echo "Version unchanged ($BASE), make sure to bump – failing."
+            exit 1
           else
             echo "Version bumped from $BASE to $PR — OK."
           fi
