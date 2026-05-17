@@ -104,7 +104,8 @@ async def get_session() -> dict[str, Any]:
 @app.post("/frame")
 async def extract_frame(req: FrameRequest) -> FileResponse:
     """Extract a single frame and return it as a JPEG."""
-    _validate_path(req.file_path)
+    file_path = _translate_path(req.file_path)
+    _validate_path(file_path)
 
     job_id = uuid.uuid4().hex
     out_path = Path(settings.output_dir) / f"{job_id}.jpg"
@@ -114,7 +115,7 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
         "-ss",
         str(req.timestamp),
         "-i",
-        req.file_path,
+        file_path,
         "-frames:v",
         "1",
         "-q:v",
@@ -144,7 +145,7 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
     return FileResponse(str(out_path), media_type="image/jpeg", filename=f"{job_id}.jpg")
 
 
-def _run_clip_ffmpeg(job_id: str, req: ClipRequest, out_path: Path) -> None:
+def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Path) -> None:
     jobs[job_id]["status"] = JobStatus.running
 
     if req.fast:
@@ -155,7 +156,7 @@ def _run_clip_ffmpeg(job_id: str, req: ClipRequest, out_path: Path) -> None:
             "-to",
             str(req.end),
             "-i",
-            req.file_path,
+            file_path,
             "-c",
             "copy",
             "-y",
@@ -165,7 +166,7 @@ def _run_clip_ffmpeg(job_id: str, req: ClipRequest, out_path: Path) -> None:
         cmd = [
             "ffmpeg",
             "-i",
-            req.file_path,
+            file_path,
             "-ss",
             str(req.start),
             "-to",
@@ -192,7 +193,8 @@ def _run_clip_ffmpeg(job_id: str, req: ClipRequest, out_path: Path) -> None:
 @app.post("/clip")
 async def extract_clip(req: ClipRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
     """Enqueue a clip extraction job and return a job ID for polling."""
-    _validate_path(req.file_path)
+    file_path = _translate_path(req.file_path)
+    _validate_path(file_path)
 
     if req.end <= req.start:
         raise HTTPException(status_code=422, detail="end must be greater than start")
@@ -201,7 +203,7 @@ async def extract_clip(req: ClipRequest, background_tasks: BackgroundTasks) -> d
     out_path = Path(settings.output_dir) / f"{job_id}.mp4"
 
     jobs[job_id] = {"status": JobStatus.pending, "filename": None, "error": None}
-    background_tasks.add_task(_run_clip_ffmpeg, job_id, req, out_path)
+    background_tasks.add_task(_run_clip_ffmpeg, job_id, file_path, req, out_path)
 
     return {"job_id": job_id, "status": JobStatus.pending}
 
@@ -232,6 +234,13 @@ async def download_output(job_id: str) -> FileResponse:
 
 
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
+
+
+def _translate_path(file_path: str) -> str:
+    """Rewrite a host media path to its container mount point."""
+    if settings.media_dir_host and file_path.startswith(settings.media_dir_host):
+        return settings.media_dir_container + file_path[len(settings.media_dir_host):]
+    return file_path
 
 
 def _validate_path(file_path: str) -> None:
