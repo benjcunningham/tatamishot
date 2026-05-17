@@ -1,0 +1,18 @@
+name: Poetry Lock Diff
+
+on:
+  pull_request:
+    paths:
+      - poetry.lock
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: sburman/diff-poetry-lock@1d43b29a0b04b54affa86ec4756794f0d0eeef26

@@ -1,0 +1,66 @@
+name: Version Bump
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Get base version
+        id: base
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          BASE=$(git show origin/${{ github.base_ref }}:pyproject.toml | grep '^version' | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$BASE" >> "$GITHUB_OUTPUT"
+
+      - name: Get PR version
+        id: pr
+        run: |
+          PR=$(grep '^version' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$PR" >> "$GITHUB_OUTPUT"
+
+      - name: Validate or auto-bump version
+        run: |
+          BASE="${{ steps.base.outputs.version }}"
+          PR="${{ steps.pr.outputs.version }}"
+
+          compare_versions() {
+            python3 - "$1" "$2" << 'EOF'
+          import sys
+          from packaging.version import Version
+          a, b = Version(sys.argv[1]), Version(sys.argv[2])
+          if a > b:
+              print("decreased")
+          elif a == b:
+              print("same")
+          else:
+              print("increased")
+          EOF
+          }
+
+          RESULT=$(compare_versions "$BASE" "$PR")
+
+          if [ "$RESULT" = "decreased" ]; then
+            echo "Version decreased from $BASE to $PR — failing."
+            exit 1
+          elif [ "$RESULT" = "same" ]; then
+            echo "Version unchanged ($BASE), auto-bumping patch."
+            pip install poetry --quiet
+            poetry version patch
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add pyproject.toml
+            git commit -m "chore: auto-bump patch version"
+            git push
+          else
+            echo "Version bumped from $BASE to $PR — OK."
+          fi
