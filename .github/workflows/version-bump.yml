@@ -1,15 +1,12 @@
-name: Version Bump
-
+name: "Version Bumper"
 on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
-
 permissions:
   contents: read
-
 jobs:
-  version-check:
+  check:
     name: Check pyproject.toml exists
     runs-on: ubuntu-latest
     permissions:
@@ -17,88 +14,133 @@ jobs:
     outputs:
       exists: ${{ steps.check.outputs.exists }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
       - id: check
         run: |
           if [ -f "pyproject.toml" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
+            echo "- pyproject.toml exists: true" >> $GITHUB_STEP_SUMMARY
           else
             echo "exists=false" >> $GITHUB_OUTPUT
+            echo "- pyproject.toml exists: false" >> $GITHUB_STEP_SUMMARY
           fi
-
-  version-bump:
+  auto_version_bump:
     name: Automated version bumper
     runs-on: ubuntu-latest
-    needs: version-check
-    if: |
-      github.event.pull_request.head.repo.fork != true &&
-      github.event.pull_request.head.commit.author.name != 'GitHub Action' &&
-      needs.version-check.outputs.exists == 'true'
+    needs: check
+      # Skip if from fork or if the commit was made by GitHub Action to prevent infinite loops
+    if: github.event.pull_request.head.repo.fork != true && github.event.pull_request.head.commit.author.name
+      != 'GitHub Action' && needs.check.outputs.exists == 'true'
     permissions:
       contents: write
       pull-requests: write
+      checks: read
     steps:
       - name: Get PR information
         id: pr_info
         env:
           PR_NUMBER: ${{ github.event.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT
           echo "head_ref=$HEAD_REF" >> $GITHUB_OUTPUT
-
-      - uses: actions/checkout@v6
+          echo "- PR number: $PR_NUMBER" >> $GITHUB_STEP_SUMMARY
+          echo "- Head SHA: $HEAD_SHA" >> $GITHUB_STEP_SUMMARY
+          echo "- Head ref: $HEAD_REF" >> $GITHUB_STEP_SUMMARY
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
         with:
           ref: ${{ steps.pr_info.outputs.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-
-      - uses: actions/setup-python@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
-
-      - uses: snok/install-poetry@v1
-
-      - name: Check version
+          python-version: '3.13'
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+      - name: Run version check
         id: version_check
         run: |
+          echo "Running version check..."
+          if [ ! -f "pyproject.toml" ]; then
+            echo "No pyproject.toml found on PR branch. Skipping version check."
+            echo "should_fix=false" >> $GITHUB_OUTPUT
+            echo "- version check: skipped (no pyproject.toml on PR branch)" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # Get pyproject.toml from current main branch
           git fetch origin main
           if ! git cat-file -e origin/main:pyproject.toml 2>/dev/null; then
-            echo "should_bump=false" >> $GITHUB_OUTPUT
+            echo "No pyproject.toml found on origin/main. Skipping version check."
+            echo "should_fix=false" >> $GITHUB_OUTPUT
+            echo "- version check: skipped (no pyproject.toml on origin/main)" >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
           git show origin/main:pyproject.toml > main_pyproject.toml
 
+          # Extract version numbers
           CURRENT_VERSION=$(awk '/^\[project\]/{flag=1} flag && /^version =/{print; flag=0}' pyproject.toml | sed -E 's/version = "([^"]*)"/\1/')
-          PREVIOUS_VERSION=$(awk '/^\[project\]/{flag=1} flag && /^version =/{print; flag=0}' main_pyproject.toml | sed -E 's/version = "([^"]*)"/\1/')
+          PREVIOUS_VERSION=$(awk '/^\[project\]/{flag=1} flag && /^version =/{print; flag=0}' main_pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+          echo "Current branch version: $CURRENT_VERSION"
+          echo "Main branch version: $PREVIOUS_VERSION"
 
+          # Parse version parts
           IFS='.' read -r CURRENT_MAJOR CURRENT_MINOR CURRENT_PATCH <<< "${CURRENT_VERSION%%[-+]*}"
           IFS='.' read -r PREVIOUS_MAJOR PREVIOUS_MINOR PREVIOUS_PATCH <<< "${PREVIOUS_VERSION%%[-+]*}"
-          CURRENT_MAJOR=${CURRENT_MAJOR:-0}; CURRENT_MINOR=${CURRENT_MINOR:-0}; CURRENT_PATCH=${CURRENT_PATCH:-0}
-          PREVIOUS_MAJOR=${PREVIOUS_MAJOR:-0}; PREVIOUS_MINOR=${PREVIOUS_MINOR:-0}; PREVIOUS_PATCH=${PREVIOUS_PATCH:-0}
 
+          # Convert to integers for numerical comparison
+          CURRENT_MAJOR=${CURRENT_MAJOR:-0}
+          CURRENT_MINOR=${CURRENT_MINOR:-0}
+          CURRENT_PATCH=${CURRENT_PATCH:-0}
+          PREVIOUS_MAJOR=${PREVIOUS_MAJOR:-0}
+          PREVIOUS_MINOR=${PREVIOUS_MINOR:-0}
+          PREVIOUS_PATCH=${PREVIOUS_PATCH:-0}
+
+          # Check if version has increased according to semver
           if [[ $CURRENT_MAJOR -gt $PREVIOUS_MAJOR ]] || \
              [[ $CURRENT_MAJOR -eq $PREVIOUS_MAJOR && $CURRENT_MINOR -gt $PREVIOUS_MINOR ]] || \
              [[ $CURRENT_MAJOR -eq $PREVIOUS_MAJOR && $CURRENT_MINOR -eq $PREVIOUS_MINOR && $CURRENT_PATCH -gt $PREVIOUS_PATCH ]]; then
-            echo "should_bump=false" >> $GITHUB_OUTPUT
-            echo "- $PREVIOUS_VERSION → $CURRENT_VERSION (already bumped)" >> $GITHUB_STEP_SUMMARY
+            echo "Version has increased from [$PREVIOUS_VERSION] to [$CURRENT_VERSION]. No bump needed."
+            echo "should_fix=false" >> $GITHUB_OUTPUT
+            echo "- version check: $PREVIOUS_VERSION → $CURRENT_VERSION (already bumped, no action needed)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "should_bump=true" >> $GITHUB_OUTPUT
-            echo "- $PREVIOUS_VERSION = $CURRENT_VERSION (bump needed)" >> $GITHUB_STEP_SUMMARY
+            echo "Version has not increased. Main branch is [$PREVIOUS_VERSION], this branch is [$CURRENT_VERSION]. Version bump needed."
+            echo "should_fix=true" >> $GITHUB_OUTPUT
+            echo "- version check: $PREVIOUS_VERSION = $CURRENT_VERSION (bump required)" >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: Bump version
-        id: bump
-        if: steps.version_check.outputs.should_bump == 'true'
+      - name: Automate version bump
+        id: commit_changes
+        if: steps.version_check.outputs.should_fix == 'true'
+        env:
+          HEAD_REF: ${{ steps.pr_info.outputs.head_ref }}
         run: |
+          echo "- head ref (bump): $HEAD_REF" >> $GITHUB_STEP_SUMMARY
           poetry version patch
-          git config user.email "action@github.com"
-          git config user.name "GitHub Action"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
           git add pyproject.toml
           git commit -m "chore: auto-bump version to fix version_check"
-          SHA=$(git rev-parse HEAD)
-          SHA_SHORT=$(git rev-parse --short HEAD)
-          echo "sha=$SHA" >> $GITHUB_OUTPUT
-          echo "sha_short=$SHA_SHORT" >> $GITHUB_OUTPUT
-          git push origin HEAD:refs/heads/${{ steps.pr_info.outputs.head_ref }}
-          echo "- bumped to $(poetry version --short) at $SHA_SHORT" >> $GITHUB_STEP_SUMMARY
+          NEW_COMMIT_SHA=$(git rev-parse HEAD)
+          NEW_COMMIT_SHA_SHORT=$(git rev-parse --short HEAD)
+          echo "new_commit_sha=$NEW_COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "new_commit_sha_short=$NEW_COMMIT_SHA_SHORT" >> $GITHUB_OUTPUT
+          git push origin HEAD:refs/heads/"$HEAD_REF"
+          echo "- version bumped: patched to $(poetry version --short) at $NEW_COMMIT_SHA_SHORT" >> $GITHUB_STEP_SUMMARY
+      - name: Add comment to PR
+        if: steps.commit_changes.outputs.new_commit_sha
+        uses: actions/github-script@v8
+        with:
+          script: |-
+            await github.rest.issues.createComment({
+              issue_number: ${{ steps.pr_info.outputs.pr_number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🤖 Project version has been automatically bumped. See: [${{ steps.commit_changes.outputs.new_commit_sha_short }}](https://github.com/${{ github.event.repository.full_name }}/commit/${{ steps.commit_changes.outputs.new_commit_sha }}). ✨'
+            })
