@@ -1,4 +1,4 @@
-name: Lint
+name: Build & Test
 
 on:
   pull_request:
@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  lint:
-    name: ruff + mypy
+  build-test:
+    name: build-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
