@@ -175,7 +175,54 @@
       padding: 0 4px;
     }
 
+    #fast-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      padding: 0 4px;
+    }
+
     #fast-toggle input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+
+    .mark-edit {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mark-edit.hidden { display: none; }
+
+    .mark-edit-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mark-edit-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 600;
+      width: 28px;
+      flex-shrink: 0;
+    }
+
+    .mark-edit-row input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      font-variant-numeric: tabular-nums;
+      padding: 10px 12px;
+    }
+
+    .mark-edit-row input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
 
     /* Primary action button */
     .action-btn {
@@ -323,6 +370,16 @@
         <span class="mark-time" id="mark-out-time">–:––:––</span>
       </button>
     </div>
+    <div id="mark-edit" class="mark-edit hidden">
+      <div class="mark-edit-row">
+        <span class="mark-edit-label">In</span>
+        <input type="number" id="mark-in-input" min="0" step="0.1" placeholder="seconds" />
+      </div>
+      <div class="mark-edit-row">
+        <span class="mark-edit-label">Out</span>
+        <input type="number" id="mark-out-input" min="0" step="0.1" placeholder="seconds" />
+      </div>
+    </div>
     <div id="clip-range">Tap Mark In and Mark Out to set range</div>
     <label id="fast-toggle">
       <input type="checkbox" id="fast-mode" checked />
@@ -360,6 +417,8 @@
   let outputUrl = null;     // blob URL of final output
   let outputFilename = null;
   let pollTimer = null;
+  let sessionFetchedAt = null;  // Date.now() at last successful Plex poll
+  let sessionBaseTs = null;     // session.timestamp at last successful Plex poll
 
   // -------------------------------------------------------------------------
   // DOM refs
@@ -376,6 +435,9 @@
   const markOutBtn   = document.getElementById('mark-out-btn');
   const markInTime   = document.getElementById('mark-in-time');
   const markOutTime  = document.getElementById('mark-out-time');
+  const markEditEl   = document.getElementById('mark-edit');
+  const markInInput  = document.getElementById('mark-in-input');
+  const markOutInput = document.getElementById('mark-out-input');
   const clipRange    = document.getElementById('clip-range');
   const fastMode     = document.getElementById('fast-mode');
   const captureFrameBtn = document.getElementById('capture-frame-btn');
@@ -397,6 +459,11 @@
     const m = Math.floor((secs % 3600) / 60);
     const s = Math.floor(secs % 60);
     return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function currentTimestamp() {
+    if (sessionBaseTs == null || sessionFetchedAt == null) return session?.timestamp ?? null;
+    return sessionBaseTs + (Date.now() - sessionFetchedAt) / 1000;
   }
 
   function showError(msg) {
@@ -429,6 +496,13 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       session = data;
+      if (data.playing && data.timestamp != null) {
+        sessionFetchedAt = Date.now();
+        sessionBaseTs = data.timestamp;
+      } else {
+        sessionFetchedAt = null;
+        sessionBaseTs = null;
+      }
       renderSession(data);
     } catch (e) {
       console.warn('Session fetch failed:', e);
@@ -451,9 +525,14 @@
       : data.title;
     sessionTitle.textContent = displayTitle;
     sessionYear.textContent = data.year ?? '';
-    sessionTs.textContent = fmtTime(data.timestamp);
     btnFrame.disabled = false;
     btnClip.disabled = false;
+  }
+
+  function tickTimestamp() {
+    if (session?.playing) {
+      sessionTs.textContent = fmtTime(currentTimestamp());
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -482,6 +561,12 @@
     markInBtn.classList.toggle('set', markIn !== null);
     markOutBtn.classList.toggle('set', markOut !== null);
 
+    if (markIn !== null) markInInput.value = markIn.toFixed(1);
+    if (markOut !== null) markOutInput.value = markOut.toFixed(1);
+
+    const hasAny = markIn !== null || markOut !== null;
+    markEditEl.classList.toggle('hidden', !hasAny);
+
     if (markIn !== null && markOut !== null && markOut > markIn) {
       const dur = markOut - markIn;
       clipRange.innerHTML = `<span>${fmtTime(markIn)}</span> → <span>${fmtTime(markOut)}</span> &nbsp;(${dur.toFixed(1)}s)`;
@@ -496,15 +581,27 @@
   }
 
   markInBtn.addEventListener('click', () => {
-    if (!session?.timestamp) return;
-    markIn = session.timestamp;
+    const ts = currentTimestamp();
+    if (ts == null) return;
+    markIn = ts;
     updateClipState();
   });
 
   markOutBtn.addEventListener('click', () => {
-    if (!session?.timestamp) return;
-    markOut = session.timestamp;
+    const ts = currentTimestamp();
+    if (ts == null) return;
+    markOut = ts;
     updateClipState();
+  });
+
+  markInInput.addEventListener('change', () => {
+    const v = parseFloat(markInInput.value);
+    if (!isNaN(v) && v >= 0) { markIn = v; updateClipState(); }
+  });
+
+  markOutInput.addEventListener('change', () => {
+    const v = parseFloat(markOutInput.value);
+    if (!isNaN(v) && v >= 0) { markOut = v; updateClipState(); }
   });
 
   // -------------------------------------------------------------------------
@@ -520,7 +617,7 @@
       const res = await fetch('/frame', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path: session.file_path, timestamp: session.timestamp }),
+        body: JSON.stringify({ file_path: session.file_path, timestamp: currentTimestamp() }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -666,6 +763,8 @@
     clearError();
     markIn = null;
     markOut = null;
+    markInInput.value = '';
+    markOutInput.value = '';
     updateClipState();
     setMode(mode); // re-show current panel
   });
@@ -674,7 +773,8 @@
   // Boot
   // -------------------------------------------------------------------------
   refreshSession();
-  setInterval(refreshSession, 5000);
+  setInterval(refreshSession, 10000);
+  setInterval(tickTimestamp, 1000);
 })();
 </script>
 </body>
