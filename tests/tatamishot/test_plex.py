@@ -70,9 +70,7 @@ def test_parse_media_metadata_extracts_file_path() -> None:
 
 
 def test_parse_media_metadata_skips_non_audio_streams() -> None:
-    meta = {
-        "Media": [{"Part": [{"file": "/f.mkv", "Stream": [{"streamType": 1, "id": "1", "index": 0}]}]}]
-    }
+    meta = {"Media": [{"Part": [{"file": "/f.mkv", "Stream": [{"streamType": 1, "id": "1", "index": 0}]}]}]}
     _, streams, _ = _parse_media_metadata(meta, set())
     assert streams == []
 
