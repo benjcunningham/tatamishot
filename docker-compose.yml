@@ -4,7 +4,7 @@ services:
     ports:
       - "8484:8484"
     volumes:
-      - ${MEDIA_DIR}:/media:ro
+      - ${MEDIA_DIR_HOST}:${MEDIA_DIR}:ro
       - ./output:/output
     env_file: .env
     extra_hosts:

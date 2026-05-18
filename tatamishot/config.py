@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8484
     media_dir_host: str = ""
-    media_dir_container: str = "/media"
+    media_dir: str = "/media"
 
 
 settings = Settings()
