@@ -28,3 +28,6 @@ jobs:
 
       - name: Lint
         run: make lint
+
+      - name: Unit tests
+        run: make test
