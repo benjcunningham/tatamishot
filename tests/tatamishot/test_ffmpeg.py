@@ -12,19 +12,19 @@ if TYPE_CHECKING:
 
 
 def test_translate_path_no_op_when_host_dir_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir_host", "")
+    monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir", "")
     monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir_container", "/media")
     assert _translate_path("/mnt/media/movie.mkv") == "/mnt/media/movie.mkv"
 
 
 def test_translate_path_rewrites_host_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir_host", "/mnt/media")
+    monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir", "/mnt/media")
     monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir_container", "/media")
     assert _translate_path("/mnt/media/movies/film.mkv") == "/media/movies/film.mkv"
 
 
 def test_translate_path_no_op_when_path_does_not_match(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir_host", "/mnt/media")
+    monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir", "/mnt/media")
     monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir_container", "/media")
     assert _translate_path("/other/path/film.mkv") == "/other/path/film.mkv"
 

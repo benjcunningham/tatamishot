@@ -55,7 +55,7 @@ def test_output_404_when_file_missing_from_disk(client: TestClient) -> None:
 def test_clip_422_when_end_before_start(tmp_path: Path, client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     f = tmp_path / "movie.mkv"
     f.write_bytes(b"data")
-    monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir_host", "")
+    monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir", "")
     monkeypatch.setattr("tatamishot.ffmpeg.settings.output_dir", str(tmp_path))
     resp = client.post("/clip", json={"file_path": str(f), "start": 10.0, "end": 5.0})
     assert resp.status_code == 422

@@ -16,8 +16,8 @@ jobs: dict[str, dict[str, Any]] = {}
 
 def _translate_path(file_path: str) -> str:
     """Rewrite a host media path to its container mount point."""
-    if settings.media_dir_host and file_path.startswith(settings.media_dir_host):
-        return settings.media_dir_container + file_path[len(settings.media_dir_host) :]
+    if settings.media_dir and file_path.startswith(settings.media_dir):
+        return settings.media_dir_container + file_path[len(settings.media_dir) :]
     return file_path
 
 
