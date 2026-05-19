@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tatamishot.ffmpeg import _translate_path, _validate_path
+from tatamishot.ffmpeg import _shift_srt_timestamps, _translate_path, _validate_path
 
 
 if TYPE_CHECKING:
@@ -39,3 +39,26 @@ def test_validate_path_passes_for_existing_file(tmp_path: Path) -> None:
     f = tmp_path / "movie.mkv"
     f.write_bytes(b"data")
     _validate_path(str(f))
+
+
+def test_shift_srt_timestamps_zero_shift_unchanged() -> None:
+    content = "1\n00:00:01,000 --> 00:00:03,000\nHello\n"
+    assert _shift_srt_timestamps(content, 0) == content
+
+
+def test_shift_srt_timestamps_positive_shift() -> None:
+    content = "1\n00:00:01,000 --> 00:00:03,000\nHello\n"
+    result = _shift_srt_timestamps(content, 1.5)
+    assert "00:00:02,500 --> 00:00:04,500" in result
+
+
+def test_shift_srt_timestamps_negative_shift() -> None:
+    content = "1\n00:00:02,000 --> 00:00:04,000\nHello\n"
+    result = _shift_srt_timestamps(content, -1.0)
+    assert "00:00:01,000 --> 00:00:03,000" in result
+
+
+def test_shift_srt_timestamps_clamps_to_zero() -> None:
+    content = "1\n00:00:00,500 --> 00:00:01,000\nHello\n"
+    result = _shift_srt_timestamps(content, -2.0)
+    assert "00:00:00,000" in result
