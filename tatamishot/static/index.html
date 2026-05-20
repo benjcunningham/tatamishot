@@ -152,6 +152,7 @@
     #capture-panel.visible { display: flex; }
 
     #capture-btn {
+      position: relative;
       width: 100%;
       padding: 24px 10px;
       border-radius: var(--radius);
@@ -172,6 +173,38 @@
     }
 
     #capture-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+    #charge-arc {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-90deg);
+      width: 64px;
+      height: 64px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+
+    #charge-arc circle {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-dasharray: 125.7;
+      stroke-dashoffset: 125.7;
+    }
+
+    #capture-btn.charging #charge-arc { opacity: 1; }
+
+    #capture-btn.charging #charge-arc circle {
+      animation: charge-fill 1s linear forwards;
+    }
+
+    @keyframes charge-fill {
+      from { stroke-dashoffset: 125.7; }
+      to   { stroke-dashoffset: 0; }
+    }
 
     #clip-range {
       background: var(--surface);
@@ -443,7 +476,12 @@
   </div>
 
   <div id="capture-panel">
-    <button id="capture-btn" disabled>Tap for Frame · Hold for Clip</button>
+    <button id="capture-btn" disabled>
+      <span id="capture-btn-label">Tap for Frame · Hold for Clip</span>
+      <svg id="charge-arc" viewBox="0 0 44 44" aria-hidden="true">
+        <circle cx="22" cy="22" r="20"/>
+      </svg>
+    </button>
     <div id="audio-track-row" class="audio-track-row hidden">
       <label for="audio-track-select">Audio</label>
       <select id="audio-track-select"></select>
@@ -513,8 +551,9 @@
   const tsNudgeRow   = document.getElementById('ts-nudge-row');
   const tsEditInput  = document.getElementById('ts-edit-input');
   const tsSyncBtn    = document.getElementById('ts-sync-btn');
-  const capturePanel = document.getElementById('capture-panel');
-  const captureBtn   = document.getElementById('capture-btn');
+  const capturePanel  = document.getElementById('capture-panel');
+  const captureBtn    = document.getElementById('capture-btn');
+  const captureBtnLbl = document.getElementById('capture-btn-label');
   const markEditEl   = document.getElementById('mark-edit');
   const markInInput  = document.getElementById('mark-in-input');
   const markOutInput = document.getElementById('mark-out-input');
@@ -743,12 +782,14 @@
     if (ts == null) return;
     captureBtn.setPointerCapture(e.pointerId);
     pressStartTs = ts;
+    captureBtn.classList.add('charging');
     holdTimer = setTimeout(() => {
       holdTimer = null;
       markIn = pressStartTs;
       markOut = null;
+      captureBtn.classList.remove('charging');
       captureBtn.classList.add('recording');
-      captureBtn.textContent = '● Recording…';
+      captureBtnLbl.textContent = '● Recording…';
       updateClipState();
     }, 1000);
   });
@@ -757,10 +798,11 @@
     if (holdTimer !== null) {
       clearTimeout(holdTimer);
       holdTimer = null;
+      captureBtn.classList.remove('charging');
       captureFrame(pressStartTs);
     } else if (captureBtn.classList.contains('recording')) {
       captureBtn.classList.remove('recording');
-      captureBtn.textContent = 'Tap for Frame · Hold for Clip';
+      captureBtnLbl.textContent = 'Tap for Frame · Hold for Clip';
       const ts = currentTimestamp();
       if (ts != null) {
         markOut = ts;
@@ -957,8 +999,8 @@
     pressStartTs = null;
     markInInput.value = '';
     markOutInput.value = '';
-    captureBtn.classList.remove('recording');
-    captureBtn.textContent = 'Tap for Frame · Hold for Clip';
+    captureBtn.classList.remove('recording', 'charging');
+    captureBtnLbl.textContent = 'Tap for Frame · Hold for Clip';
     updateClipState();
   });
 
