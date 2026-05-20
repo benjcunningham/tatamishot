@@ -184,32 +184,27 @@
     }
 
     /* Clip controls */
-    #clip-markers {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .marker-btn {
-      padding: 20px 10px;
+    #hold-clip-btn {
+      width: 100%;
+      padding: 24px 10px;
       border-radius: var(--radius);
       border: 2px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: 0.95rem;
+      font-size: 1rem;
       font-weight: 700;
       cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, background 0.15s;
+      user-select: none;
+      touch-action: none;
     }
 
-    .marker-btn.set { border-color: var(--accent); }
+    #hold-clip-btn.recording {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
 
-    .marker-btn .mark-label { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
-    .marker-btn .mark-time { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+    #hold-clip-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
 
     #clip-range {
       background: var(--surface);
@@ -493,16 +488,7 @@
 
   <!-- Clip panel -->
   <div id="clip-panel">
-    <div id="clip-markers">
-      <button class="marker-btn" id="mark-in-btn">
-        <span class="mark-label">MARK IN</span>
-        <span class="mark-time" id="mark-in-time">–:––:––</span>
-      </button>
-      <button class="marker-btn" id="mark-out-btn">
-        <span class="mark-label">MARK OUT</span>
-        <span class="mark-time" id="mark-out-time">–:––:––</span>
-      </button>
-    </div>
+    <button id="hold-clip-btn" disabled>Hold to Mark Clip</button>
     <div id="mark-edit" class="mark-edit hidden">
       <div class="mark-edit-row">
         <span class="mark-edit-label">In</span>
@@ -513,7 +499,7 @@
         <input type="number" id="mark-out-input" min="0" step="0.1" placeholder="seconds" />
       </div>
     </div>
-    <div id="clip-range">Tap Mark In and Mark Out to set range</div>
+    <div id="clip-range">Hold the button to mark your clip</div>
     <div id="audio-track-row" class="audio-track-row hidden">
       <label for="audio-track-select">Audio</label>
       <select id="audio-track-select"></select>
@@ -577,11 +563,8 @@
   const btnClip      = document.getElementById('btn-clip');
   const framePanel   = document.getElementById('frame-panel');
   const clipPanel    = document.getElementById('clip-panel');
-  const markInBtn    = document.getElementById('mark-in-btn');
-  const markOutBtn   = document.getElementById('mark-out-btn');
-  const markInTime   = document.getElementById('mark-in-time');
-  const markOutTime  = document.getElementById('mark-out-time');
   const markEditEl   = document.getElementById('mark-edit');
+  const holdClipBtn  = document.getElementById('hold-clip-btn');
   const markInInput  = document.getElementById('mark-in-input');
   const markOutInput = document.getElementById('mark-out-input');
   const clipRange    = document.getElementById('clip-range');
@@ -677,6 +660,7 @@
       tsNudgeRow.classList.add('hidden');
       btnFrame.disabled = true;
       btnClip.disabled = true;
+      holdClipBtn.disabled = true;
       audioTrackRow.classList.add('hidden');
       subtitleTrackRow.classList.add('hidden');
       frameSubtitleTrackRow.classList.add('hidden');
@@ -684,6 +668,7 @@
     }
     sessionCard.classList.remove('idle');
     tsNudgeRow.classList.remove('hidden');
+    holdClipBtn.disabled = false;
     const displayTitle = data.grandparent_title
       ? `${data.grandparent_title} – ${data.title}`
       : data.title;
@@ -797,15 +782,7 @@
   btnFrame.addEventListener('click', () => setMode('frame'));
   btnClip.addEventListener('click', () => setMode('clip'));
 
-  // -------------------------------------------------------------------------
-  // Mark in / out
-  // -------------------------------------------------------------------------
   function updateClipState() {
-    markInTime.textContent = fmtTime(markIn);
-    markOutTime.textContent = fmtTime(markOut);
-    markInBtn.classList.toggle('set', markIn !== null);
-    markOutBtn.classList.toggle('set', markOut !== null);
-
     if (markIn !== null) markInInput.value = markIn.toFixed(1);
     if (markOut !== null) markOutInput.value = markOut.toFixed(1);
 
@@ -820,24 +797,35 @@
       clipRange.textContent = 'Mark Out must be after Mark In';
       captureClipBtn.disabled = true;
     } else {
-      clipRange.textContent = 'Tap Mark In and Mark Out to set range';
+      clipRange.textContent = 'Hold the button to mark your clip';
       captureClipBtn.disabled = true;
     }
   }
 
-  markInBtn.addEventListener('click', () => {
+  holdClipBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
     const ts = currentTimestamp();
     if (ts == null) return;
+    holdClipBtn.setPointerCapture(e.pointerId);
     markIn = ts;
+    markOut = null;
+    holdClipBtn.classList.add('recording');
+    holdClipBtn.textContent = '● Recording…';
     updateClipState();
   });
 
-  markOutBtn.addEventListener('click', () => {
+  function finishHold() {
+    if (!holdClipBtn.classList.contains('recording')) return;
+    holdClipBtn.classList.remove('recording');
+    holdClipBtn.textContent = 'Hold to Mark Clip';
     const ts = currentTimestamp();
     if (ts == null) return;
     markOut = ts;
     updateClipState();
-  });
+  }
+
+  holdClipBtn.addEventListener('pointerup', finishHold);
+  holdClipBtn.addEventListener('pointercancel', finishHold);
 
   markInInput.addEventListener('change', () => {
     const v = parseFloat(markInInput.value);
@@ -1020,6 +1008,8 @@
     markOut = null;
     markInInput.value = '';
     markOutInput.value = '';
+    holdClipBtn.classList.remove('recording');
+    holdClipBtn.textContent = 'Hold to Mark Clip';
     updateClipState();
     setMode(mode); // re-show current panel
   });
