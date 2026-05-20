@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import uuid
 from pathlib import Path
 from typing import Any
@@ -9,9 +10,15 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from tatamishot.config import settings
-from tatamishot.ffmpeg import _run_clip_ffmpeg, _translate_path, _validate_path, jobs
+from tatamishot.ffmpeg import _extract_shifted_srt, _run_clip_ffmpeg, _translate_path, _validate_path, jobs
 from tatamishot.models import ClipRequest, FrameRequest, JobStatus
-from tatamishot.plex import _parse_media_metadata, _selected_audio_ids
+from tatamishot.plex import (
+    ParsedMedia,
+    _parse_media_metadata,
+    _selected_audio_ids,
+    _selected_subtitle_ids,
+    _subtitle_offset_from_session,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -51,11 +58,10 @@ async def get_session() -> JSONResponse:
     )
 
     selected_ids = _selected_audio_ids(session)
+    selected_sub_ids = _selected_subtitle_ids(session)
+    subtitle_offset = _subtitle_offset_from_session(session)
     logger.info("selected audio stream ids from session: %s", selected_ids)
-
-    file_path: str | None = None
-    audio_streams: list[dict[str, Any]] = []
-    audio_stream_index: int | None = None
+    logger.info("selected subtitle stream ids from session: %s", selected_sub_ids)
 
     rating_key = session.get("ratingKey")
     if rating_key:
@@ -71,13 +77,17 @@ async def get_session() -> JSONResponse:
             logger.warning("failed to fetch library metadata for %s: %s", rating_key, exc)
             meta = {}
 
-        file_path, audio_streams, audio_stream_index = _parse_media_metadata(meta, selected_ids)
+        parsed = _parse_media_metadata(meta, selected_ids, selected_sub_ids)
+    else:
+        parsed = ParsedMedia()
 
     logger.info(
-        "resolved file_path=%r audio_streams=%d audio_stream_index=%r",
-        file_path,
-        len(audio_streams),
-        audio_stream_index,
+        "resolved file_path=%r audio_streams=%d audio_stream_index=%r subtitle_streams=%d subtitle_stream_index=%r",
+        parsed.file_path,
+        len(parsed.audio_streams),
+        parsed.audio_stream_index,
+        len(parsed.subtitle_streams),
+        parsed.subtitle_stream_index,
     )
 
     view_offset_ms: int = session.get("viewOffset", 0)
@@ -89,11 +99,14 @@ async def get_session() -> JSONResponse:
             "grandparent_title": session.get("grandparentTitle"),
             "year": session.get("year"),
             "thumb": session.get("thumb"),
-            "file_path": file_path,
+            "file_path": parsed.file_path,
             "timestamp": view_offset_ms / 1000,
             "duration": session.get("duration", 0) / 1000,
-            "audio_streams": audio_streams,
-            "audio_stream_index": audio_stream_index,
+            "audio_streams": parsed.audio_streams,
+            "audio_stream_index": parsed.audio_stream_index,
+            "subtitle_streams": parsed.subtitle_streams,
+            "subtitle_stream_index": parsed.subtitle_stream_index,
+            "subtitle_offset": subtitle_offset,
         },
         headers=no_cache,
     )
@@ -108,12 +121,19 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
     job_id = uuid.uuid4().hex
     out_path = Path(settings.output_dir) / f"{job_id}.jpg"
 
+    srt_path: str | None = None
+    if req.subtitle_stream_index is not None:
+        srt_path = _extract_shifted_srt(file_path, req.subtitle_stream_index, req.subtitle_offset - req.timestamp)
+
+    subtitle_filter = ["-vf", f"subtitles={srt_path}"] if srt_path else []
+
     cmd = [
         "ffmpeg",
         "-ss",
         str(req.timestamp),
         "-i",
         file_path,
+        *subtitle_filter,
         "-frames:v",
         "1",
         "-q:v",
@@ -133,6 +153,12 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
         _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
     except TimeoutError as exc:
         raise HTTPException(status_code=504, detail="ffmpeg timed out") from exc
+    finally:
+        if srt_path:
+            try:
+                os.unlink(srt_path)
+            except OSError:
+                pass
 
     if proc.returncode != 0:
         raise HTTPException(

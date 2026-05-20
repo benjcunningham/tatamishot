@@ -255,6 +255,37 @@
       border-color: var(--accent);
     }
 
+    .subtitle-track-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .subtitle-track-row.hidden { display: none; }
+
+    .subtitle-track-row label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 600;
+      width: 44px;
+      flex-shrink: 0;
+    }
+
+    .subtitle-track-row select {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 10px 12px;
+    }
+
+    .subtitle-track-row select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
     /* Primary action button */
     .action-btn {
       width: 100%;
@@ -386,6 +417,10 @@
 
   <!-- Frame panel -->
   <div id="frame-panel">
+    <div id="frame-subtitle-track-row" class="subtitle-track-row hidden">
+      <label for="frame-subtitle-track-select">Subs</label>
+      <select id="frame-subtitle-track-select"></select>
+    </div>
     <button class="action-btn" id="capture-frame-btn">Capture Frame</button>
   </div>
 
@@ -415,6 +450,10 @@
     <div id="audio-track-row" class="audio-track-row hidden">
       <label for="audio-track-select">Audio</label>
       <select id="audio-track-select"></select>
+    </div>
+    <div id="subtitle-track-row" class="subtitle-track-row hidden">
+      <label for="subtitle-track-select">Subs</label>
+      <select id="subtitle-track-select"></select>
     </div>
     <label id="fast-toggle">
       <input type="checkbox" id="fast-mode" checked />
@@ -479,6 +518,10 @@
   const captureClipBtn  = document.getElementById('capture-clip-btn');
   const audioTrackRow   = document.getElementById('audio-track-row');
   const audioTrackSelect = document.getElementById('audio-track-select');
+  const subtitleTrackRow = document.getElementById('subtitle-track-row');
+  const subtitleTrackSelect = document.getElementById('subtitle-track-select');
+  const frameSubtitleTrackRow = document.getElementById('frame-subtitle-track-row');
+  const frameSubtitleTrackSelect = document.getElementById('frame-subtitle-track-select');
   const progressEl   = document.getElementById('progress');
   const progressMsg  = document.getElementById('progress-msg');
   const errorEl      = document.getElementById('error-msg');
@@ -555,6 +598,8 @@
       btnFrame.disabled = true;
       btnClip.disabled = true;
       audioTrackRow.classList.add('hidden');
+      subtitleTrackRow.classList.add('hidden');
+      frameSubtitleTrackRow.classList.add('hidden');
       return;
     }
     sessionCard.classList.remove('idle');
@@ -582,6 +627,32 @@
         audioTrackSelect.value = currentVal;
       }
     }
+
+    function buildSubtitleSelect(selectEl, rowEl, subs, defaultIndex) {
+      const burnableSubs = subs.filter(s => s.burnable);
+      rowEl.classList.toggle('hidden', burnableSubs.length === 0);
+      if (burnableSubs.length === 0) return;
+      const currentVal = selectEl.value;
+      selectEl.innerHTML = '';
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = 'None';
+      selectEl.appendChild(noneOpt);
+      for (const s of burnableSubs) {
+        const opt = document.createElement('option');
+        opt.value = s.index;
+        opt.textContent = s.label;
+        if (s.index === defaultIndex) opt.selected = true;
+        selectEl.appendChild(opt);
+      }
+      if (currentVal && burnableSubs.some(s => String(s.index) === currentVal)) {
+        selectEl.value = currentVal;
+      }
+    }
+
+    const subs = data.subtitle_streams ?? [];
+    buildSubtitleSelect(subtitleTrackSelect, subtitleTrackRow, subs, data.subtitle_stream_index ?? null);
+    buildSubtitleSelect(frameSubtitleTrackSelect, frameSubtitleTrackRow, subs, data.subtitle_stream_index ?? null);
   }
 
   function tickTimestamp() {
@@ -672,7 +743,12 @@
       const res = await fetch('/frame', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path: session.file_path, timestamp: currentTimestamp() }),
+        body: JSON.stringify({
+          file_path: session.file_path,
+          timestamp: currentTimestamp(),
+          subtitle_stream_index: frameSubtitleTrackSelect.value !== '' ? parseInt(frameSubtitleTrackSelect.value, 10) : null,
+          subtitle_offset: session?.subtitle_offset ?? 0,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -710,6 +786,8 @@
           audio_stream_index: audioTrackRow.classList.contains('hidden')
             ? (session?.audio_stream_index ?? null)
             : (audioTrackSelect.value !== '' ? parseInt(audioTrackSelect.value, 10) : null),
+          subtitle_stream_index: subtitleTrackSelect.value !== '' ? parseInt(subtitleTrackSelect.value, 10) : null,
+          subtitle_offset: session?.subtitle_offset ?? 0,
         }),
       });
       if (!res.ok) {
