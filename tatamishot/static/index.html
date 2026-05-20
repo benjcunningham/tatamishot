@@ -174,38 +174,6 @@
 
     #capture-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
 
-    #charge-arc {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(-90deg);
-      width: 64px;
-      height: 64px;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.1s;
-    }
-
-    #charge-arc circle {
-      fill: none;
-      stroke: var(--accent);
-      stroke-width: 2.5;
-      stroke-linecap: round;
-      stroke-dasharray: 125.7;
-      stroke-dashoffset: 125.7;
-    }
-
-    #capture-btn.charging #charge-arc { opacity: 1; }
-
-    #capture-btn.charging #charge-arc circle {
-      animation: charge-fill 1s linear forwards;
-    }
-
-    @keyframes charge-fill {
-      from { stroke-dashoffset: 125.7; }
-      to   { stroke-dashoffset: 0; }
-    }
-
     #clip-range {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -478,9 +446,6 @@
   <div id="capture-panel">
     <button id="capture-btn" disabled>
       <span id="capture-btn-label">Tap for Frame · Hold for Clip</span>
-      <svg id="charge-arc" viewBox="0 0 44 44" aria-hidden="true">
-        <circle cx="22" cy="22" r="20"/>
-      </svg>
     </button>
     <div id="audio-track-row" class="audio-track-row hidden">
       <label for="audio-track-select">Audio</label>
@@ -782,23 +747,21 @@
     if (ts == null) return;
     captureBtn.setPointerCapture(e.pointerId);
     pressStartTs = ts;
-    captureBtn.classList.add('charging');
+    captureBtn.classList.add('recording');
     holdTimer = setTimeout(() => {
       holdTimer = null;
       markIn = pressStartTs;
       markOut = null;
-      captureBtn.classList.remove('charging');
-      captureBtn.classList.add('recording');
       captureBtnLbl.textContent = '● Recording…';
       updateClipState();
-    }, 1000);
+    }, 500);
   });
 
   function finishPress() {
     if (holdTimer !== null) {
       clearTimeout(holdTimer);
       holdTimer = null;
-      captureBtn.classList.remove('charging');
+      captureBtn.classList.remove('recording');
       captureFrame(pressStartTs);
     } else if (captureBtn.classList.contains('recording')) {
       captureBtn.classList.remove('recording');
@@ -999,7 +962,7 @@
     pressStartTs = null;
     markInInput.value = '';
     markOutInput.value = '';
-    captureBtn.classList.remove('recording', 'charging');
+    captureBtn.classList.remove('recording');
     captureBtnLbl.textContent = 'Tap for Frame · Hold for Clip';
     updateClipState();
   });
