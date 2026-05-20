@@ -142,74 +142,37 @@
 
     #session-card.idle .title { color: var(--muted); }
 
-    /* Mode toggle */
-    #mode-toggle {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .mode-btn {
-      padding: 18px 10px;
-      border-radius: var(--radius);
-      border: 2px solid var(--border);
-      background: var(--surface);
-      color: var(--text);
-      font-size: 1.1rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-      text-align: center;
-    }
-
-    .mode-btn.active {
-      border-color: var(--accent);
-      background: #2a1e00;
-    }
-
-    .mode-btn:disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
-    }
-
-    /* Action panels */
-    #frame-panel, #clip-panel {
+    /* Capture panel */
+    #capture-panel {
       display: none;
       flex-direction: column;
       gap: 12px;
     }
 
-    #frame-panel.visible, #clip-panel.visible {
-      display: flex;
-    }
+    #capture-panel.visible { display: flex; }
 
-    /* Clip controls */
-    #clip-markers {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .marker-btn {
-      padding: 20px 10px;
+    #capture-btn {
+      position: relative;
+      width: 100%;
+      padding: 24px 10px;
       border-radius: var(--radius);
       border: 2px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-size: 0.95rem;
+      font-size: 1rem;
       font-weight: 700;
       cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, background 0.15s;
+      user-select: none;
+      touch-action: none;
     }
 
-    .marker-btn.set { border-color: var(--accent); }
+    #capture-btn.recording {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
 
-    .marker-btn .mark-label { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
-    .marker-btn .mark-time { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+    #capture-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
 
     #clip-range {
       background: var(--surface);
@@ -220,6 +183,8 @@
       color: var(--muted);
       text-align: center;
     }
+
+    #clip-range.hidden { display: none; }
 
     #clip-range span { color: var(--text); font-weight: 600; }
 
@@ -359,6 +324,7 @@
 
     .action-btn:active { background: var(--accent-dim); }
     .action-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+    .action-btn.hidden { display: none; }
 
     /* Progress */
     #progress {
@@ -477,43 +443,10 @@
     <button id="ts-sync-btn" class="hidden">resync with plex</button>
   </div>
 
-  <div id="mode-toggle">
-    <button class="mode-btn" id="btn-frame" disabled>🖼 Frame</button>
-    <button class="mode-btn" id="btn-clip" disabled>✂️ Clip</button>
-  </div>
-
-  <!-- Frame panel -->
-  <div id="frame-panel">
-    <div id="frame-subtitle-track-row" class="subtitle-track-row hidden">
-      <label for="frame-subtitle-track-select">Subs</label>
-      <select id="frame-subtitle-track-select"></select>
-    </div>
-    <button class="action-btn" id="capture-frame-btn">Capture Frame</button>
-  </div>
-
-  <!-- Clip panel -->
-  <div id="clip-panel">
-    <div id="clip-markers">
-      <button class="marker-btn" id="mark-in-btn">
-        <span class="mark-label">MARK IN</span>
-        <span class="mark-time" id="mark-in-time">–:––:––</span>
-      </button>
-      <button class="marker-btn" id="mark-out-btn">
-        <span class="mark-label">MARK OUT</span>
-        <span class="mark-time" id="mark-out-time">–:––:––</span>
-      </button>
-    </div>
-    <div id="mark-edit" class="mark-edit hidden">
-      <div class="mark-edit-row">
-        <span class="mark-edit-label">In</span>
-        <input type="number" id="mark-in-input" min="0" step="0.1" placeholder="seconds" />
-      </div>
-      <div class="mark-edit-row">
-        <span class="mark-edit-label">Out</span>
-        <input type="number" id="mark-out-input" min="0" step="0.1" placeholder="seconds" />
-      </div>
-    </div>
-    <div id="clip-range">Tap Mark In and Mark Out to set range</div>
+  <div id="capture-panel">
+    <button id="capture-btn" disabled>
+      <span id="capture-btn-label">Tap for Frame · Hold for Clip</span>
+    </button>
     <div id="audio-track-row" class="audio-track-row hidden">
       <label for="audio-track-select">Audio</label>
       <select id="audio-track-select"></select>
@@ -526,7 +459,18 @@
       <input type="checkbox" id="fast-mode" checked />
       Fast mode (keyframe-accurate, instant)
     </label>
-    <button class="action-btn" id="capture-clip-btn" disabled>Export Clip</button>
+    <div id="mark-edit" class="mark-edit hidden">
+      <div class="mark-edit-row">
+        <span class="mark-edit-label">In</span>
+        <input type="number" id="mark-in-input" min="0" step="0.1" placeholder="seconds" />
+      </div>
+      <div class="mark-edit-row">
+        <span class="mark-edit-label">Out</span>
+        <input type="number" id="mark-out-input" min="0" step="0.1" placeholder="seconds" />
+      </div>
+    </div>
+    <div id="clip-range" class="hidden"></div>
+    <button class="action-btn hidden" id="capture-clip-btn" disabled>Export Clip</button>
   </div>
 
   <!-- Progress -->
@@ -552,7 +496,6 @@
   // State
   // -------------------------------------------------------------------------
   let session = null;       // current plex session data
-  let mode = null;          // 'frame' | 'clip'
   let markIn = null;        // seconds
   let markOut = null;       // seconds
   let outputUrl = null;     // blob URL of final output
@@ -573,27 +516,19 @@
   const tsNudgeRow   = document.getElementById('ts-nudge-row');
   const tsEditInput  = document.getElementById('ts-edit-input');
   const tsSyncBtn    = document.getElementById('ts-sync-btn');
-  const btnFrame     = document.getElementById('btn-frame');
-  const btnClip      = document.getElementById('btn-clip');
-  const framePanel   = document.getElementById('frame-panel');
-  const clipPanel    = document.getElementById('clip-panel');
-  const markInBtn    = document.getElementById('mark-in-btn');
-  const markOutBtn   = document.getElementById('mark-out-btn');
-  const markInTime   = document.getElementById('mark-in-time');
-  const markOutTime  = document.getElementById('mark-out-time');
+  const capturePanel  = document.getElementById('capture-panel');
+  const captureBtn    = document.getElementById('capture-btn');
+  const captureBtnLbl = document.getElementById('capture-btn-label');
   const markEditEl   = document.getElementById('mark-edit');
   const markInInput  = document.getElementById('mark-in-input');
   const markOutInput = document.getElementById('mark-out-input');
   const clipRange    = document.getElementById('clip-range');
   const fastMode     = document.getElementById('fast-mode');
-  const captureFrameBtn = document.getElementById('capture-frame-btn');
   const captureClipBtn  = document.getElementById('capture-clip-btn');
   const audioTrackRow   = document.getElementById('audio-track-row');
   const audioTrackSelect = document.getElementById('audio-track-select');
   const subtitleTrackRow = document.getElementById('subtitle-track-row');
   const subtitleTrackSelect = document.getElementById('subtitle-track-select');
-  const frameSubtitleTrackRow = document.getElementById('frame-subtitle-track-row');
-  const frameSubtitleTrackSelect = document.getElementById('frame-subtitle-track-select');
   const progressEl   = document.getElementById('progress');
   const progressMsg  = document.getElementById('progress-msg');
   const errorEl      = document.getElementById('error-msg');
@@ -675,22 +610,21 @@
       sessionTitle.textContent = 'Nothing playing in Plex';
       sessionYear.textContent = '';
       tsNudgeRow.classList.add('hidden');
-      btnFrame.disabled = true;
-      btnClip.disabled = true;
+      captureBtn.disabled = true;
+      capturePanel.classList.remove('visible');
       audioTrackRow.classList.add('hidden');
       subtitleTrackRow.classList.add('hidden');
-      frameSubtitleTrackRow.classList.add('hidden');
       return;
     }
     sessionCard.classList.remove('idle');
     tsNudgeRow.classList.remove('hidden');
+    captureBtn.disabled = false;
+    capturePanel.classList.add('visible');
     const displayTitle = data.grandparent_title
       ? `${data.grandparent_title} – ${data.title}`
       : data.title;
     sessionTitle.textContent = displayTitle;
     sessionYear.textContent = data.year ?? '';
-    btnFrame.disabled = false;
-    btnClip.disabled = false;
 
     const streams = data.audio_streams ?? [];
     audioTrackRow.classList.toggle('hidden', streams.length < 2);
@@ -733,7 +667,6 @@
 
     const subs = data.subtitle_streams ?? [];
     buildSubtitleSelect(subtitleTrackSelect, subtitleTrackRow, subs, data.subtitle_stream_index ?? null);
-    buildSubtitleSelect(frameSubtitleTrackSelect, frameSubtitleTrackRow, subs, data.subtitle_stream_index ?? null);
   }
 
   function tickTimestamp() {
@@ -780,32 +713,7 @@
     refreshSession();
   });
 
-  // -------------------------------------------------------------------------
-  // Mode selection
-  // -------------------------------------------------------------------------
-  function setMode(m) {
-    mode = m;
-    btnFrame.classList.toggle('active', m === 'frame');
-    btnClip.classList.toggle('active', m === 'clip');
-    framePanel.classList.toggle('visible', m === 'frame');
-    clipPanel.classList.toggle('visible', m === 'clip');
-    clearError();
-    outputEl.classList.remove('visible');
-    hideProgress();
-  }
-
-  btnFrame.addEventListener('click', () => setMode('frame'));
-  btnClip.addEventListener('click', () => setMode('clip'));
-
-  // -------------------------------------------------------------------------
-  // Mark in / out
-  // -------------------------------------------------------------------------
   function updateClipState() {
-    markInTime.textContent = fmtTime(markIn);
-    markOutTime.textContent = fmtTime(markOut);
-    markInBtn.classList.toggle('set', markIn !== null);
-    markOutBtn.classList.toggle('set', markOut !== null);
-
     if (markIn !== null) markInInput.value = markIn.toFixed(1);
     if (markOut !== null) markOutInput.value = markOut.toFixed(1);
 
@@ -815,29 +723,72 @@
     if (markIn !== null && markOut !== null && markOut > markIn) {
       const dur = markOut - markIn;
       clipRange.innerHTML = `<span>${fmtTime(markIn)}</span> → <span>${fmtTime(markOut)}</span> &nbsp;(${dur.toFixed(1)}s)`;
+      clipRange.classList.remove('hidden');
       captureClipBtn.disabled = false;
+      captureClipBtn.classList.remove('hidden');
     } else if (markIn !== null && markOut !== null) {
       clipRange.textContent = 'Mark Out must be after Mark In';
+      clipRange.classList.remove('hidden');
       captureClipBtn.disabled = true;
+      captureClipBtn.classList.remove('hidden');
     } else {
-      clipRange.textContent = 'Tap Mark In and Mark Out to set range';
+      clipRange.classList.add('hidden');
       captureClipBtn.disabled = true;
+      captureClipBtn.classList.add('hidden');
     }
   }
 
-  markInBtn.addEventListener('click', () => {
+  let holdTimer = null;
+  let recordingTick = null;
+  let pressStartTs = null;
+  let pressStartWall = null;
+
+  captureBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
     const ts = currentTimestamp();
     if (ts == null) return;
-    markIn = ts;
-    updateClipState();
+    captureBtn.setPointerCapture(e.pointerId);
+    pressStartTs = ts;
+    pressStartWall = Date.now();
+    captureBtn.classList.add('recording');
+    holdTimer = setTimeout(() => {
+      holdTimer = null;
+      markIn = pressStartTs;
+      markOut = null;
+      updateClipState();
+      recordingTick = setInterval(() => {
+        const dur = ((Date.now() - pressStartWall) / 1000).toFixed(1);
+        captureBtnLbl.textContent = `● Recording… (${dur}s)`;
+      }, 100);
+    }, 500);
   });
 
-  markOutBtn.addEventListener('click', () => {
-    const ts = currentTimestamp();
-    if (ts == null) return;
-    markOut = ts;
-    updateClipState();
-  });
+  function finishPress() {
+    if (recordingTick !== null) {
+      clearInterval(recordingTick);
+      recordingTick = null;
+    }
+    if (holdTimer !== null) {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+      captureBtn.classList.remove('recording');
+      captureFrame(pressStartTs);
+    } else if (captureBtn.classList.contains('recording')) {
+      captureBtn.classList.remove('recording');
+      captureBtnLbl.textContent = 'Tap for Frame · Hold for Clip';
+      const ts = currentTimestamp();
+      if (ts != null) {
+        markOut = ts;
+        updateClipState();
+        if (markOut > markIn) captureClipBtn.click();
+      }
+    }
+    pressStartTs = null;
+    pressStartWall = null;
+  }
+
+  captureBtn.addEventListener('pointerup', finishPress);
+  captureBtn.addEventListener('pointercancel', finishPress);
 
   markInInput.addEventListener('change', () => {
     const v = parseFloat(markInInput.value);
@@ -852,11 +803,11 @@
   // -------------------------------------------------------------------------
   // Frame capture
   // -------------------------------------------------------------------------
-  captureFrameBtn.addEventListener('click', async () => {
+  async function captureFrame(ts) {
     if (!session?.file_path) return showError('No active session file path.');
     clearError();
     showProgress('Extracting frame…');
-    captureFrameBtn.disabled = true;
+    captureBtn.disabled = true;
 
     try {
       const res = await fetch('/frame', {
@@ -864,8 +815,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           file_path: session.file_path,
-          timestamp: currentTimestamp(),
-          subtitle_stream_index: frameSubtitleTrackSelect.value !== '' ? parseInt(frameSubtitleTrackSelect.value, 10) : null,
+          timestamp: ts,
+          subtitle_stream_index: subtitleTrackSelect.value !== '' ? parseInt(subtitleTrackSelect.value, 10) : null,
           subtitle_offset: session?.subtitle_offset ?? 0,
         }),
       });
@@ -879,9 +830,9 @@
       showError(`Frame capture failed: ${e.message}`);
     } finally {
       hideProgress();
-      captureFrameBtn.disabled = false;
+      captureBtn.disabled = false;
     }
-  });
+  }
 
   // -------------------------------------------------------------------------
   // Clip capture
@@ -1016,12 +967,17 @@
     outputEl.classList.remove('visible');
     outputMedia.innerHTML = '';
     clearError();
+    if (holdTimer !== null) { clearTimeout(holdTimer); holdTimer = null; }
+    if (recordingTick !== null) { clearInterval(recordingTick); recordingTick = null; }
     markIn = null;
     markOut = null;
+    pressStartTs = null;
+    pressStartWall = null;
     markInInput.value = '';
     markOutInput.value = '';
+    captureBtn.classList.remove('recording');
+    captureBtnLbl.textContent = 'Tap for Frame · Hold for Clip';
     updateClipState();
-    setMode(mode); // re-show current panel
   });
 
   // -------------------------------------------------------------------------
