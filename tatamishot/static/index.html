@@ -762,7 +762,11 @@
       captureBtn.classList.remove('recording');
       captureBtn.textContent = 'Tap for Frame · Hold for Clip';
       const ts = currentTimestamp();
-      if (ts != null) { markOut = ts; updateClipState(); }
+      if (ts != null) {
+        markOut = ts;
+        updateClipState();
+        if (markOut > markIn) captureClipBtn.click();
+      }
     }
     pressStartTs = null;
   }
