@@ -92,7 +92,7 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
 
     srt_path: str | None = None
     if req.subtitle_stream_index is not None:
-        srt_path = _extract_shifted_srt(file_path, req.subtitle_stream_index, req.subtitle_offset)
+        srt_path = _extract_shifted_srt(file_path, req.subtitle_stream_index, req.subtitle_offset - req.start)
 
     audio_map = ["-map", "0:v:0", "-map", f"0:{req.audio_stream_index}"] if req.audio_stream_index is not None else []
     subtitle_filter = ["-vf", f"subtitles={srt_path}"] if srt_path else []
