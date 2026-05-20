@@ -124,7 +124,11 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
     srt_path: str | None = None
     if req.subtitle_stream_index is not None:
         srt_path = _extract_shifted_srt(
-            file_path, req.subtitle_stream_index, req.subtitle_offset - req.timestamp, extract_to=req.timestamp + 1
+            file_path,
+            req.subtitle_stream_index,
+            req.subtitle_offset - req.timestamp,
+            extract_from=req.timestamp,
+            extract_to=req.timestamp + 1,
         )
 
     subtitle_filter = ["-vf", f"subtitles={srt_path}"] if srt_path else []
