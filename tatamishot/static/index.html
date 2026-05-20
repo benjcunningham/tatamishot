@@ -81,7 +81,64 @@
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       color: var(--accent);
+      cursor: pointer;
+      user-select: none;
     }
+
+    #ts-nudge-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #ts-nudge-row.hidden { display: none; }
+
+    .nudge-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .nudge-btn:active { background: var(--border); }
+
+    #session-ts-wrap {
+      flex: 1;
+      text-align: center;
+    }
+
+    #ts-edit-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 4px 8px;
+      text-align: center;
+      display: none;
+    }
+
+    #ts-edit-input.visible { display: block; }
+
+    #ts-sync-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      padding: 4px 6px;
+      text-decoration: underline;
+    }
+
+    #ts-sync-btn.hidden { display: none; }
 
     #session-card.idle .title { color: var(--muted); }
 
@@ -407,7 +464,17 @@
     <div class="meta">
       <span id="session-year"></span>
     </div>
-    <div class="timestamp" id="session-ts">–:––:––</div>
+    <div id="ts-nudge-row" class="hidden">
+      <button class="nudge-btn" data-nudge="-5">−5s</button>
+      <button class="nudge-btn" data-nudge="-1">−1s</button>
+      <div id="session-ts-wrap">
+        <div class="timestamp" id="session-ts">–:––:––</div>
+        <input type="number" id="ts-edit-input" step="0.1" placeholder="seconds" />
+      </div>
+      <button class="nudge-btn" data-nudge="1">+1s</button>
+      <button class="nudge-btn" data-nudge="5">+5s</button>
+    </div>
+    <button id="ts-sync-btn" class="hidden">resync with plex</button>
   </div>
 
   <div id="mode-toggle">
@@ -493,6 +560,8 @@
   let pollTimer = null;
   let sessionFetchedAt = null;  // Date.now() at last successful Plex poll
   let sessionBaseTs = null;     // session.timestamp at last successful Plex poll
+  let userOffset = 0;           // seconds manually nudged by user
+  let currentRatingKey = null;  // ratingKey of last seen title (resets offset on change)
 
   // -------------------------------------------------------------------------
   // DOM refs
@@ -501,6 +570,9 @@
   const sessionTitle = document.getElementById('session-title');
   const sessionYear  = document.getElementById('session-year');
   const sessionTs    = document.getElementById('session-ts');
+  const tsNudgeRow   = document.getElementById('ts-nudge-row');
+  const tsEditInput  = document.getElementById('ts-edit-input');
+  const tsSyncBtn    = document.getElementById('ts-sync-btn');
   const btnFrame     = document.getElementById('btn-frame');
   const btnClip      = document.getElementById('btn-clip');
   const framePanel   = document.getElementById('frame-panel');
@@ -543,7 +615,7 @@
 
   function currentTimestamp() {
     if (sessionBaseTs == null || sessionFetchedAt == null) return session?.timestamp ?? null;
-    return sessionBaseTs + (Date.now() - sessionFetchedAt) / 1000;
+    return sessionBaseTs + (Date.now() - sessionFetchedAt) / 1000 + userOffset;
   }
 
   function showError(msg) {
@@ -577,8 +649,16 @@
       const data = await res.json();
       session = data;
       if (data.playing && data.timestamp != null) {
-        sessionFetchedAt = Date.now();
-        sessionBaseTs = data.timestamp;
+        const titleChanged = data.ratingKey && data.ratingKey !== currentRatingKey;
+        if (titleChanged) {
+          userOffset = 0;
+          currentRatingKey = data.ratingKey;
+          tsSyncBtn.classList.add('hidden');
+        }
+        if (userOffset === 0) {
+          sessionFetchedAt = Date.now();
+          sessionBaseTs = data.timestamp;
+        }
       } else {
         sessionFetchedAt = null;
         sessionBaseTs = null;
@@ -594,7 +674,7 @@
       sessionCard.classList.add('idle');
       sessionTitle.textContent = 'Nothing playing in Plex';
       sessionYear.textContent = '';
-      sessionTs.textContent = '–:––:––';
+      tsNudgeRow.classList.add('hidden');
       btnFrame.disabled = true;
       btnClip.disabled = true;
       audioTrackRow.classList.add('hidden');
@@ -603,6 +683,7 @@
       return;
     }
     sessionCard.classList.remove('idle');
+    tsNudgeRow.classList.remove('hidden');
     const displayTitle = data.grandparent_title
       ? `${data.grandparent_title} – ${data.title}`
       : data.title;
@@ -660,6 +741,44 @@
       sessionTs.textContent = fmtTime(currentTimestamp());
     }
   }
+
+  document.querySelectorAll('.nudge-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!session?.playing) return;
+      userOffset += parseFloat(btn.dataset.nudge);
+      tsSyncBtn.classList.toggle('hidden', userOffset === 0);
+      tickTimestamp();
+    });
+  });
+
+  sessionTs.addEventListener('click', () => {
+    if (!session?.playing) return;
+    tsEditInput.value = currentTimestamp().toFixed(1);
+    sessionTs.style.display = 'none';
+    tsEditInput.classList.add('visible');
+    tsEditInput.focus();
+    tsEditInput.select();
+  });
+
+  function commitTsEdit() {
+    const v = parseFloat(tsEditInput.value);
+    if (!isNaN(v) && v >= 0) {
+      userOffset = v - (sessionBaseTs + (Date.now() - sessionFetchedAt) / 1000);
+      tsSyncBtn.classList.toggle('hidden', userOffset === 0);
+    }
+    tsEditInput.classList.remove('visible');
+    sessionTs.style.display = '';
+    tickTimestamp();
+  }
+
+  tsEditInput.addEventListener('blur', commitTsEdit);
+  tsEditInput.addEventListener('keydown', e => { if (e.key === 'Enter') tsEditInput.blur(); });
+
+  tsSyncBtn.addEventListener('click', () => {
+    userOffset = 0;
+    tsSyncBtn.classList.add('hidden');
+    refreshSession();
+  });
 
   // -------------------------------------------------------------------------
   // Mode selection
