@@ -642,7 +642,7 @@
         const opt = document.createElement('option');
         opt.value = s.index;
         opt.textContent = s.label;
-        if (s.selected && s.index === defaultIndex) opt.selected = true;
+        if (s.index === defaultIndex) opt.selected = true;
         selectEl.appendChild(opt);
       }
       if (currentVal && burnableSubs.some(s => String(s.index) === currentVal)) {
