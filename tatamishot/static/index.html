@@ -649,13 +649,16 @@
       const data = await res.json();
       session = data;
       if (data.playing && data.timestamp != null) {
-        if (data.ratingKey && data.ratingKey !== currentRatingKey) {
+        const titleChanged = data.ratingKey && data.ratingKey !== currentRatingKey;
+        if (titleChanged) {
           userOffset = 0;
           currentRatingKey = data.ratingKey;
           tsSyncBtn.classList.add('hidden');
         }
-        sessionFetchedAt = Date.now();
-        sessionBaseTs = data.timestamp;
+        if (userOffset === 0) {
+          sessionFetchedAt = Date.now();
+          sessionBaseTs = data.timestamp;
+        }
       } else {
         sessionFetchedAt = null;
         sessionBaseTs = null;
@@ -777,7 +780,7 @@
   tsSyncBtn.addEventListener('click', () => {
     userOffset = 0;
     tsSyncBtn.classList.add('hidden');
-    tickTimestamp();
+    refreshSession();
   });
 
   // -------------------------------------------------------------------------
