@@ -126,6 +126,9 @@
     #ts-edit-input.visible { display: block; }
 
     #ts-sync-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
       background: none;
       border: none;
       color: var(--muted);
@@ -133,7 +136,6 @@
       cursor: pointer;
       padding: 4px 6px;
       text-decoration: underline;
-      flex-shrink: 0;
     }
 
     #ts-sync-btn.hidden { display: none; }
@@ -471,8 +473,8 @@
       </div>
       <button class="nudge-btn" data-nudge="1">+1s</button>
       <button class="nudge-btn" data-nudge="5">+5s</button>
-      <button id="ts-sync-btn" class="hidden">resync</button>
     </div>
+    <button id="ts-sync-btn" class="hidden">resync with plex</button>
   </div>
 
   <div id="mode-toggle">
