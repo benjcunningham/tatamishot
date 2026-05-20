@@ -2,6 +2,8 @@
 
 Detect what's playing in Plex, grab a frame or clip, share it from your phone.
 
+The name comes from Yasujirō Ozu's _tatami shot_, his signature low-angle compositions filmed from floor level. The goal of this software is to replace the philistine's version of the tatami shot: slumping into the couch, pointing your phone up to the TV, trying to take a bootleg-quality picture of a frame you like.
+
 ## Setup
 
 Copy the example env file and fill in your values:
