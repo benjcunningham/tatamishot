@@ -49,17 +49,21 @@ def _shift_srt_timestamps(content: str, shift_seconds: float) -> str:
     return re.sub(r"\d{2}:\d{2}:\d{2},\d{3}", shift_ts, content)
 
 
-def _extract_shifted_srt(file_path: str, stream_index: int, shift_seconds: float) -> str | None:
-    """Extract a subtitle stream as SRT and apply a timestamp shift.
+def _extract_shifted_srt(
+    file_path: str, stream_index: int, shift_seconds: float, extract_to: float | None = None
+) -> str | None:
+    """Extract a subtitle stream as SRT, optionally scoped to a time range, and apply a timestamp shift.
 
-    Returns the path to a temp file, or None if extraction fails (e.g. image-based subs).
-    Caller is responsible for deleting the temp file.
+    extract_to limits extraction to that many seconds from the start of the file, avoiding a full
+    scan of large source files. Returns the path to a temp file, or None if extraction fails
+    (e.g. image-based subs). Caller is responsible for deleting the temp file.
     """
     with tempfile.NamedTemporaryFile(suffix=".srt", delete=False) as f:
         raw_path = f.name
 
+    to_args = ["-to", str(extract_to)] if extract_to is not None else []
     result = subprocess.run(
-        ["ffmpeg", "-i", file_path, "-map", f"0:{stream_index}", "-c:s", "srt", "-y", raw_path],
+        ["ffmpeg", "-i", file_path, *to_args, "-map", f"0:{stream_index}", "-c:s", "srt", "-y", raw_path],
         capture_output=True,
         check=False,
     )
@@ -92,7 +96,9 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
 
     srt_path: str | None = None
     if req.subtitle_stream_index is not None:
-        srt_path = _extract_shifted_srt(file_path, req.subtitle_stream_index, req.subtitle_offset - req.start)
+        srt_path = _extract_shifted_srt(
+            file_path, req.subtitle_stream_index, req.subtitle_offset - req.start, extract_to=req.end
+        )
 
     audio_map = ["-map", "0:v:0", "-map", f"0:{req.audio_stream_index}"] if req.audio_stream_index is not None else []
     subtitle_filter = ["-vf", f"subtitles={srt_path}"] if srt_path else []
