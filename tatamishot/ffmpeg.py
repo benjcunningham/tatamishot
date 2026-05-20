@@ -112,6 +112,7 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
     audio_map = ["-map", "0:v:0", "-map", f"0:{req.audio_stream_index}"] if req.audio_stream_index is not None else []
     subtitle_filter = ["-vf", f"subtitles={srt_path}"] if srt_path else []
     video_codec = "libx264" if srt_path else "copy"
+    x264_preset = ["-preset", "ultrafast"] if srt_path else []
 
     if req.fast:
         cmd = [
@@ -126,6 +127,7 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
             *subtitle_filter,
             "-c:v",
             video_codec,
+            *x264_preset,
             "-c:a",
             "aac",
             "-y",
@@ -144,6 +146,8 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
             *subtitle_filter,
             "-c:v",
             "libx264",
+            "-preset",
+            "ultrafast",
             "-c:a",
             "aac",
             "-y",
