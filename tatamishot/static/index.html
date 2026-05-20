@@ -739,7 +739,9 @@
   }
 
   let holdTimer = null;
+  let recordingTick = null;
   let pressStartTs = null;
+  let pressStartWall = null;
 
   captureBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -747,17 +749,25 @@
     if (ts == null) return;
     captureBtn.setPointerCapture(e.pointerId);
     pressStartTs = ts;
+    pressStartWall = Date.now();
     captureBtn.classList.add('recording');
     holdTimer = setTimeout(() => {
       holdTimer = null;
       markIn = pressStartTs;
       markOut = null;
-      captureBtnLbl.textContent = '● Recording…';
       updateClipState();
+      recordingTick = setInterval(() => {
+        const dur = ((Date.now() - pressStartWall) / 1000).toFixed(1);
+        captureBtnLbl.textContent = `● Recording… (${dur}s)`;
+      }, 100);
     }, 500);
   });
 
   function finishPress() {
+    if (recordingTick !== null) {
+      clearInterval(recordingTick);
+      recordingTick = null;
+    }
     if (holdTimer !== null) {
       clearTimeout(holdTimer);
       holdTimer = null;
@@ -774,6 +784,7 @@
       }
     }
     pressStartTs = null;
+    pressStartWall = null;
   }
 
   captureBtn.addEventListener('pointerup', finishPress);
@@ -957,9 +968,11 @@
     outputMedia.innerHTML = '';
     clearError();
     if (holdTimer !== null) { clearTimeout(holdTimer); holdTimer = null; }
+    if (recordingTick !== null) { clearInterval(recordingTick); recordingTick = null; }
     markIn = null;
     markOut = null;
     pressStartTs = null;
+    pressStartWall = null;
     markInInput.value = '';
     markOutInput.value = '';
     captureBtn.classList.remove('recording');
