@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -6,7 +8,7 @@ from typing import TYPE_CHECKING
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette_context import context
 from starlette_context.middleware import RawContextMiddleware
 from starlette_context.plugins import CorrelationIdPlugin, RequestIdPlugin
@@ -17,7 +19,7 @@ from tatamishot.routes import router
 
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Callable
+    from collections.abc import AsyncGenerator
 
     from starlette.responses import Response
 
@@ -25,7 +27,7 @@ configure_logging()
 
 
 class LogContextMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable[..., Response]) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(**context.data)
         return await call_next(request)
