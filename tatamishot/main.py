@@ -27,10 +27,7 @@ configure_logging()
 class LogContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable[..., Response]) -> Response:
         structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(
-            request_id=context.get("X-Request-ID"),
-            correlation_id=context.get("X-Correlation-ID"),
-        )
+        structlog.contextvars.bind_contextvars(**context.data)
         return await call_next(request)
 
 

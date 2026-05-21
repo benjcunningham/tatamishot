@@ -53,7 +53,7 @@ make docker/logs | jq 'select(.event == "clip_cmd" or .event == "frame_cmd")'
 make docker/logs | jq 'select(.job_id == "<id>")'
 
 # follow a specific request
-make docker/logs | jq 'select(.request_id == "<id>")'
+make docker/logs | jq 'select(.["X-Request-ID"] == "<id>")'
 ```
 
 `make docker/logs` is an alias for `docker compose logs -f tatamishot`. You can also run that directly if you want to pass extra flags (e.g. `--since 10m`).
