@@ -37,6 +37,24 @@ make docker/up
 
 Logs: `make docker/logs` — Stop: `make docker/down`
 
+Logs are structured JSON. Every line is a JSON object, so you can filter with `jq`:
+
+```bash
+# live tail, pretty-printed
+make docker/logs | jq .
+
+# only warnings and errors
+make docker/logs | jq 'select(.level == "warning" or .level == "error")'
+
+# watch ffmpeg commands as they fire
+make docker/logs | jq 'select(.event == "clip_cmd" or .event == "frame_cmd")'
+
+# follow a specific job
+make docker/logs | jq 'select(.job_id == "<id>")'
+```
+
+`make docker/logs` is an alias for `docker compose logs -f tatamishot`. You can also run that directly if you want to pass extra flags (e.g. `--since 10m`).
+
 After pulling new changes, do a full rebuild:
 
 ```bash
