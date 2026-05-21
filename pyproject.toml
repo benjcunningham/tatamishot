@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "tatamishot"
-version = "0.6.0"
+version = "0.7.0"
 description = "Plex frame/clip capture web app"
 repository = "https://github.com/benjcunningham/tatami-shot"
 requires-python = ">=3.14"
@@ -52,6 +52,8 @@ fastapi = "^0.136.1"
 httpx = "^0.28.1"
 pydantic-settings = "^2.14.1"
 uvicorn = { extras = ["standard"], version = "^0.47.0"}
+structlog = "^25.5.0"
+starlette-context = "^0.5.1"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [ "ARG001", "ARG002", "PLC2701", "PLR0904", "PLR0914", "PLC2701",]

@@ -37,6 +37,27 @@ make docker/up
 
 Logs: `make docker/logs` — Stop: `make docker/down`
 
+Logs are structured JSON. `make docker/logs` runs `docker compose logs -f --no-log-prefix` — the `--no-log-prefix` flag strips the `tatamishot  | ` container prefix so lines are pure JSON. Pipe through `grep '^{'` to skip any non-JSON startup lines, then into `jq`:
+
+```bash
+# live tail, pretty-printed
+make docker/logs | grep '^{' | jq .
+
+# only warnings and errors
+make docker/logs | grep '^{' | jq 'select(.level == "warning" or .level == "error")'
+
+# watch ffmpeg commands as they fire
+make docker/logs | grep '^{' | jq 'select(.event == "clip_cmd" or .event == "frame_cmd")'
+
+# follow a specific job
+make docker/logs | grep '^{' | jq 'select(.job_id == "<id>")'
+
+# follow a specific request
+make docker/logs | grep '^{' | jq 'select(.["X-Request-ID"] == "<id>")'
+```
+
+`make docker/logs` is an alias for `docker compose logs -f --no-log-prefix tatamishot`. You can also run that directly if you want to pass extra flags (e.g. `--since 10m`).
+
 After pulling new changes, do a full rebuild:
 
 ```bash
