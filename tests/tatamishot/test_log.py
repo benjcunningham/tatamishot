@@ -44,6 +44,15 @@ def test_middleware_binds_generated_request_id(client: TestClient) -> None:
     assert kwargs["X-Request-ID"]
 
 
+def test_middleware_binds_method_and_path(client: TestClient) -> None:
+    with patch("structlog.contextvars.bind_contextvars") as mock_bind:
+        client.get("/jobs/notreal")
+
+    kwargs = mock_bind.call_args.kwargs
+    assert kwargs["method"] == "GET"
+    assert kwargs["path"] == "/jobs/notreal"
+
+
 def test_middleware_uses_provided_request_id(client: TestClient) -> None:
     with patch("structlog.contextvars.bind_contextvars") as mock_bind:
         client.get("/jobs/notreal", headers={"X-Request-ID": "550e8400-e29b-41d4-a716-446655440000"})

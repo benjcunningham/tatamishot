@@ -29,7 +29,11 @@ configure_logging()
 class LogContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(**context.data)
+        structlog.contextvars.bind_contextvars(
+            **context.data,
+            method=request.method,
+            path=request.url.path,
+        )
         return await call_next(request)
 
 

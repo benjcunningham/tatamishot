@@ -70,7 +70,7 @@ docker/down: ## Stop the app via Docker Compose
 
 .PHONY: docker/logs
 docker/logs: ## Tail logs from the running container
-	docker compose logs -f
+	docker compose logs -f --no-log-prefix
 
 .PHONY: docker/restart
 docker/restart: ## Restart the app container
