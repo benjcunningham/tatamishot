@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import os
 import uuid
 from pathlib import Path
@@ -11,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from tatamishot.config import settings
 from tatamishot.ffmpeg import _extract_shifted_srt, _run_clip_ffmpeg, _translate_path, _validate_path, jobs
+from tatamishot.log import log
 from tatamishot.models import ClipRequest, FrameRequest, JobStatus
 from tatamishot.plex import (
     ParsedMedia,
@@ -20,8 +20,6 @@ from tatamishot.plex import (
     _subtitle_offset_from_session,
 )
 
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -44,24 +42,24 @@ async def get_session() -> JSONResponse:
             raise HTTPException(status_code=502, detail=f"Plex unreachable: {exc}") from exc
 
     sessions = resp.json().get("MediaContainer", {}).get("Metadata", [])
-    logger.info("plex sessions count: %d", len(sessions))
+    log.info("plex_sessions", count=len(sessions))
 
     if not sessions:
         return JSONResponse({"playing": False}, headers=no_cache)
 
     session = sessions[0]
-    logger.info(
-        "plex session type=%s title=%r ratingKey=%s",
-        session.get("type"),
-        session.get("title"),
-        session.get("ratingKey"),
+    log.info(
+        "plex_session",
+        type=session.get("type"),
+        title=session.get("title"),
+        rating_key=session.get("ratingKey"),
     )
 
     selected_ids = _selected_audio_ids(session)
     selected_sub_ids = _selected_subtitle_ids(session)
     subtitle_offset = _subtitle_offset_from_session(session)
-    logger.info("selected audio stream ids from session: %s", selected_ids)
-    logger.info("selected subtitle stream ids from session: %s", selected_sub_ids)
+    log.info("plex_selected_audio_streams", stream_ids=selected_ids)
+    log.info("plex_selected_subtitle_streams", stream_ids=selected_sub_ids)
 
     rating_key = session.get("ratingKey")
     if rating_key:
@@ -74,20 +72,20 @@ async def get_session() -> JSONResponse:
             meta_resp.raise_for_status()
             meta = meta_resp.json().get("MediaContainer", {}).get("Metadata", [{}])[0]
         except (httpx.HTTPError, IndexError, KeyError) as exc:
-            logger.warning("failed to fetch library metadata for %s: %s", rating_key, exc)
+            log.warning("plex_metadata_fetch_failed", rating_key=rating_key, error=str(exc))
             meta = {}
 
         parsed = _parse_media_metadata(meta, selected_ids, selected_sub_ids)
     else:
         parsed = ParsedMedia()
 
-    logger.info(
-        "resolved file_path=%r audio_streams=%d audio_stream_index=%r subtitle_streams=%d subtitle_stream_index=%r",
-        parsed.file_path,
-        len(parsed.audio_streams),
-        parsed.audio_stream_index,
-        len(parsed.subtitle_streams),
-        parsed.subtitle_stream_index,
+    log.info(
+        "plex_media_resolved",
+        file_path=parsed.file_path,
+        audio_streams=len(parsed.audio_streams),
+        audio_stream_index=parsed.audio_stream_index,
+        subtitle_streams=len(parsed.subtitle_streams),
+        subtitle_stream_index=parsed.subtitle_stream_index,
     )
 
     view_offset_ms: int = session.get("viewOffset", 0)
@@ -148,7 +146,7 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
         str(out_path),
     ]
 
-    logger.info("frame cmd: %s", " ".join(cmd))
+    log.info("frame_cmd", cmd=" ".join(cmd))
 
     try:
         proc = await asyncio.create_subprocess_exec(

@@ -1,4 +1,3 @@
-import logging
 import os
 import re
 import subprocess
@@ -9,10 +8,9 @@ from typing import Any
 from fastapi import HTTPException
 
 from tatamishot.config import settings
+from tatamishot.log import log
 from tatamishot.models import ClipRequest, JobStatus
 
-
-logger = logging.getLogger(__name__)
 
 jobs: dict[str, dict[str, Any]] = {}
 
@@ -74,10 +72,10 @@ def _extract_shifted_srt(
     )
 
     if result.returncode != 0:
-        logger.warning(
-            "subtitle extraction failed for stream %d: %s",
-            stream_index,
-            result.stderr.decode(errors="replace")[-200:],
+        log.warning(
+            "subtitle_extraction_failed",
+            stream_index=stream_index,
+            stderr=result.stderr.decode(errors="replace")[-200:],
         )
         try:
             os.unlink(raw_path)
@@ -154,7 +152,7 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
             str(out_path),
         ]
 
-    logger.info("clip cmd: %s", " ".join(cmd))
+    log.info("clip_cmd", cmd=" ".join(cmd))
 
     try:
         result = subprocess.run(cmd, capture_output=True, check=False)

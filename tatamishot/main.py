@@ -1,4 +1,3 @@
-import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -8,13 +7,14 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from tatamishot.config import settings
+from tatamishot.log import configure_logging
 from tatamishot.routes import router
 
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-logging.basicConfig(level=logging.INFO)
+configure_logging()
 
 
 @asynccontextmanager
