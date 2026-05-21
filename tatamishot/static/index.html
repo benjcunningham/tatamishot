@@ -588,7 +588,6 @@
         if (titleChanged) {
           userOffset = 0;
           currentRatingKey = data.ratingKey;
-          tsSyncBtn.classList.add('hidden');
         }
         if (userOffset === 0) {
           sessionFetchedAt = Date.now();
@@ -610,6 +609,7 @@
       sessionTitle.textContent = 'Nothing playing in Plex';
       sessionYear.textContent = '';
       tsNudgeRow.classList.add('hidden');
+      tsSyncBtn.classList.add('hidden');
       captureBtn.disabled = true;
       capturePanel.classList.remove('visible');
       audioTrackRow.classList.add('hidden');
@@ -618,6 +618,7 @@
     }
     sessionCard.classList.remove('idle');
     tsNudgeRow.classList.remove('hidden');
+    tsSyncBtn.classList.remove('hidden');
     captureBtn.disabled = false;
     capturePanel.classList.add('visible');
     const displayTitle = data.grandparent_title
@@ -679,7 +680,6 @@
     btn.addEventListener('click', () => {
       if (!session?.playing) return;
       userOffset += parseFloat(btn.dataset.nudge);
-      tsSyncBtn.classList.toggle('hidden', userOffset === 0);
       tickTimestamp();
     });
   });
@@ -697,7 +697,6 @@
     const v = parseFloat(tsEditInput.value);
     if (!isNaN(v) && v >= 0) {
       userOffset = v - (sessionBaseTs + (Date.now() - sessionFetchedAt) / 1000);
-      tsSyncBtn.classList.toggle('hidden', userOffset === 0);
     }
     tsEditInput.classList.remove('visible');
     sessionTs.style.display = '';
@@ -709,7 +708,6 @@
 
   tsSyncBtn.addEventListener('click', () => {
     userOffset = 0;
-    tsSyncBtn.classList.add('hidden');
     refreshSession();
   });
 
