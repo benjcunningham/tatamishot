@@ -435,7 +435,7 @@
       <button class="nudge-btn" data-nudge="-1">−1s</button>
       <div id="session-ts-wrap">
         <div class="timestamp" id="session-ts">–:––:––</div>
-        <input type="number" id="ts-edit-input" step="0.1" placeholder="seconds" />
+        <input type="text" id="ts-edit-input" placeholder="h:mm:ss" />
       </div>
       <button class="nudge-btn" data-nudge="1">+1s</button>
       <button class="nudge-btn" data-nudge="5">+5s</button>
@@ -462,11 +462,11 @@
     <div id="mark-edit" class="mark-edit hidden">
       <div class="mark-edit-row">
         <span class="mark-edit-label">In</span>
-        <input type="number" id="mark-in-input" min="0" step="0.1" placeholder="seconds" />
+        <input type="text" id="mark-in-input" placeholder="h:mm:ss" />
       </div>
       <div class="mark-edit-row">
         <span class="mark-edit-label">Out</span>
-        <input type="number" id="mark-out-input" min="0" step="0.1" placeholder="seconds" />
+        <input type="text" id="mark-out-input" placeholder="h:mm:ss" />
       </div>
     </div>
     <div id="clip-range" class="hidden"></div>
@@ -546,6 +546,16 @@
     const m = Math.floor((secs % 3600) / 60);
     const s = Math.floor(secs % 60);
     return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function parseHms(str) {
+    if (str == null) return NaN;
+    const parts = String(str).trim().split(':').map(Number);
+    if (parts.some(isNaN)) return NaN;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 1) return parts[0];
+    return NaN;
   }
 
   function currentTimestamp() {
@@ -686,7 +696,7 @@
 
   sessionTs.addEventListener('click', () => {
     if (!session?.playing) return;
-    tsEditInput.value = currentTimestamp().toFixed(1);
+    tsEditInput.value = fmtTime(currentTimestamp());
     sessionTs.style.display = 'none';
     tsEditInput.classList.add('visible');
     tsEditInput.focus();
@@ -694,7 +704,7 @@
   });
 
   function commitTsEdit() {
-    const v = parseFloat(tsEditInput.value);
+    const v = parseHms(tsEditInput.value);
     if (!isNaN(v) && v >= 0) {
       userOffset = v - (sessionBaseTs + (Date.now() - sessionFetchedAt) / 1000);
     }
@@ -712,15 +722,15 @@
   });
 
   function updateClipState() {
-    if (markIn !== null) markInInput.value = markIn.toFixed(1);
-    if (markOut !== null) markOutInput.value = markOut.toFixed(1);
+    if (markIn !== null) markInInput.value = fmtTime(markIn);
+    if (markOut !== null) markOutInput.value = fmtTime(markOut);
 
     const hasAny = markIn !== null || markOut !== null;
     markEditEl.classList.toggle('hidden', !hasAny);
 
     if (markIn !== null && markOut !== null && markOut > markIn) {
       const dur = markOut - markIn;
-      clipRange.innerHTML = `<span>${fmtTime(markIn)}</span> → <span>${fmtTime(markOut)}</span> &nbsp;(${dur.toFixed(1)}s)`;
+      clipRange.innerHTML = `<span>${fmtTime(markIn)}</span> → <span>${fmtTime(markOut)}</span> &nbsp;(${fmtTime(dur)})`;
       clipRange.classList.remove('hidden');
       captureClipBtn.disabled = false;
       captureClipBtn.classList.remove('hidden');
@@ -789,12 +799,12 @@
   captureBtn.addEventListener('pointercancel', finishPress);
 
   markInInput.addEventListener('change', () => {
-    const v = parseFloat(markInInput.value);
+    const v = parseHms(markInInput.value);
     if (!isNaN(v) && v >= 0) { markIn = v; updateClipState(); }
   });
 
   markOutInput.addEventListener('change', () => {
-    const v = parseFloat(markOutInput.value);
+    const v = parseHms(markOutInput.value);
     if (!isNaN(v) && v >= 0) { markOut = v; updateClipState(); }
   });
 
