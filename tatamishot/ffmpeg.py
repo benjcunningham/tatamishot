@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import structlog
 from fastapi import HTTPException
 
 from tatamishot.config import settings
@@ -95,6 +96,7 @@ def _extract_shifted_srt(
 
 
 def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Path) -> None:
+    structlog.contextvars.bind_contextvars(job_id=job_id)
     jobs[job_id]["status"] = JobStatus.running
 
     srt_path: str | None = None

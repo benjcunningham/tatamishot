@@ -1046,6 +1046,21 @@ anyio = ">=3.6.2,<5"
 full = ["httpx (>=0.27.0,<0.29.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.18)", "pyyaml"]
 
 [[package]]
+name = "starlette-context"
+version = "0.5.1"
+description = "Middleware for Starlette that allows you to store and access the context data of a request. Can be used with logging so logs automatically use request headers such as x-request-id or x-correlation-id."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "starlette_context-0.5.1-py3-none-any.whl", hash = "sha256:df55da1d7ae3453e89874b9d5c1d40a98dd2f1293c37791dd7c1a907087c9b5e"},
+    {file = "starlette_context-0.5.1.tar.gz", hash = "sha256:f6025753f8ede041778b2f2c3823e2da9df3c2d94832575bcb59374216b7c2b2"},
+]
+
+[package.dependencies]
+starlette = ">=0.27.0"
+
+[[package]]
 name = "structlog"
 version = "25.5.0"
 description = "Structured Logging for Python"
@@ -1371,4 +1386,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.14"
-content-hash = "0f1e7e6b99f68bf4e9fe3cad109fbf7d6bbe12f2b8e2243a0c4c733d1296f493"
+content-hash = "988a07383a21ff1cf07855ef6b5e4a342d6e692600aff3bb14f6682547b5fa3f"
