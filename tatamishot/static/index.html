@@ -182,69 +182,37 @@
       font-size: 0.9rem;
       color: var(--muted);
       text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
     }
 
     #clip-range.hidden { display: none; }
 
-    #clip-range span { color: var(--text); font-weight: 600; }
-
-    #fast-toggle {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.85rem;
-      color: var(--muted);
-      padding: 0 4px;
-    }
-
-    #fast-toggle {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.85rem;
-      color: var(--muted);
-      padding: 0 4px;
-    }
-
-    #fast-toggle input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
-
-    .mark-edit {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .mark-edit.hidden { display: none; }
-
-    .mark-edit-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .mark-edit-label {
-      font-size: 0.8rem;
-      color: var(--muted);
-      font-weight: 600;
-      width: 28px;
-      flex-shrink: 0;
-    }
-
-    .mark-edit-row input {
-      flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
+    .mark-ts {
       color: var(--text);
-      font-size: 1rem;
+      font-weight: 600;
       font-variant-numeric: tabular-nums;
-      padding: 10px 12px;
+      cursor: pointer;
+      border-bottom: 1px dashed var(--border);
     }
 
-    .mark-edit-row input:focus {
-      outline: none;
-      border-color: var(--accent);
+    .mark-ts-input {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-variant-numeric: tabular-nums;
+      padding: 4px 8px;
+      width: 9ch;
+      text-align: center;
+      display: none;
     }
+
+    .mark-ts-input.visible { display: inline-block; }
 
     .audio-track-row {
       display: flex;
@@ -459,17 +427,14 @@
       <input type="checkbox" id="fast-mode" checked />
       Fast mode (keyframe-accurate, instant)
     </label>
-    <div id="mark-edit" class="mark-edit hidden">
-      <div class="mark-edit-row">
-        <span class="mark-edit-label">In</span>
-        <input type="text" id="mark-in-input" placeholder="h:mm:ss" />
-      </div>
-      <div class="mark-edit-row">
-        <span class="mark-edit-label">Out</span>
-        <input type="text" id="mark-out-input" placeholder="h:mm:ss" />
-      </div>
+    <div id="clip-range" class="hidden">
+      <span id="mark-in-display" class="mark-ts"></span>
+      <input type="text" id="mark-in-input" class="mark-ts-input" placeholder="h:mm:ss" />
+      <span>→</span>
+      <span id="mark-out-display" class="mark-ts"></span>
+      <input type="text" id="mark-out-input" class="mark-ts-input" placeholder="h:mm:ss" />
+      <span id="clip-duration"></span>
     </div>
-    <div id="clip-range" class="hidden"></div>
     <button class="action-btn hidden" id="capture-clip-btn" disabled>Export Clip</button>
   </div>
 
@@ -519,10 +484,12 @@
   const capturePanel  = document.getElementById('capture-panel');
   const captureBtn    = document.getElementById('capture-btn');
   const captureBtnLbl = document.getElementById('capture-btn-label');
-  const markEditEl   = document.getElementById('mark-edit');
-  const markInInput  = document.getElementById('mark-in-input');
-  const markOutInput = document.getElementById('mark-out-input');
-  const clipRange    = document.getElementById('clip-range');
+  const markInDisplay  = document.getElementById('mark-in-display');
+  const markInInput    = document.getElementById('mark-in-input');
+  const markOutDisplay = document.getElementById('mark-out-display');
+  const markOutInput   = document.getElementById('mark-out-input');
+  const clipRange      = document.getElementById('clip-range');
+  const clipDuration   = document.getElementById('clip-duration');
   const fastMode     = document.getElementById('fast-mode');
   const captureClipBtn  = document.getElementById('capture-clip-btn');
   const audioTrackRow   = document.getElementById('audio-track-row');
@@ -722,29 +689,51 @@
   });
 
   function updateClipState() {
-    if (markIn !== null) markInInput.value = fmtTime(markIn);
-    if (markOut !== null) markOutInput.value = fmtTime(markOut);
+    markInDisplay.textContent  = markIn  !== null ? fmtTime(markIn)  : '–:––:––';
+    markOutDisplay.textContent = markOut !== null ? fmtTime(markOut) : '–:––:––';
 
     const hasAny = markIn !== null || markOut !== null;
-    markEditEl.classList.toggle('hidden', !hasAny);
+    clipRange.classList.toggle('hidden', !hasAny);
 
     if (markIn !== null && markOut !== null && markOut > markIn) {
       const dur = markOut - markIn;
-      clipRange.innerHTML = `<span>${fmtTime(markIn)}</span> → <span>${fmtTime(markOut)}</span> &nbsp;(${fmtTime(dur)})`;
-      clipRange.classList.remove('hidden');
+      clipDuration.textContent = `(${Math.round(dur)}s)`;
       captureClipBtn.disabled = false;
       captureClipBtn.classList.remove('hidden');
     } else if (markIn !== null && markOut !== null) {
-      clipRange.textContent = 'Mark Out must be after Mark In';
-      clipRange.classList.remove('hidden');
+      clipDuration.textContent = 'Mark Out must be after Mark In';
       captureClipBtn.disabled = true;
       captureClipBtn.classList.remove('hidden');
     } else {
-      clipRange.classList.add('hidden');
+      clipDuration.textContent = '';
       captureClipBtn.disabled = true;
       captureClipBtn.classList.add('hidden');
     }
   }
+
+  function makeMarkEditable(displayEl, inputEl, getValue, setValue) {
+    displayEl.addEventListener('click', () => {
+      inputEl.value = displayEl.textContent;
+      displayEl.style.display = 'none';
+      inputEl.classList.add('visible');
+      inputEl.focus();
+      inputEl.select();
+    });
+
+    function commit() {
+      const v = parseHms(inputEl.value);
+      if (!isNaN(v) && v >= 0) setValue(v);
+      inputEl.classList.remove('visible');
+      displayEl.style.display = '';
+      updateClipState();
+    }
+
+    inputEl.addEventListener('blur', commit);
+    inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') inputEl.blur(); });
+  }
+
+  makeMarkEditable(markInDisplay,  markInInput,  () => markIn,  v => { markIn  = v; });
+  makeMarkEditable(markOutDisplay, markOutInput, () => markOut, v => { markOut = v; });
 
   let holdTimer = null;
   let recordingTick = null;
@@ -797,16 +786,6 @@
 
   captureBtn.addEventListener('pointerup', finishPress);
   captureBtn.addEventListener('pointercancel', finishPress);
-
-  markInInput.addEventListener('change', () => {
-    const v = parseHms(markInInput.value);
-    if (!isNaN(v) && v >= 0) { markIn = v; updateClipState(); }
-  });
-
-  markOutInput.addEventListener('change', () => {
-    const v = parseHms(markOutInput.value);
-    if (!isNaN(v) && v >= 0) { markOut = v; updateClipState(); }
-  });
 
   // -------------------------------------------------------------------------
   // Frame capture
@@ -981,8 +960,6 @@
     markOut = null;
     pressStartTs = null;
     pressStartWall = null;
-    markInInput.value = '';
-    markOutInput.value = '';
     captureBtn.classList.remove('recording');
     captureBtnLbl.textContent = 'Tap for Frame · Hold for Clip';
     updateClipState();
