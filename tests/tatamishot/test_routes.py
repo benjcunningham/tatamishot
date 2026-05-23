@@ -52,6 +52,11 @@ def test_output_404_when_file_missing_from_disk(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
+def test_session_401_without_token(client: TestClient) -> None:
+    resp = client.get("/session")
+    assert resp.status_code == 401
+
+
 def test_clip_422_when_end_before_start(tmp_path: Path, client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     f = tmp_path / "movie.mkv"
     f.write_bytes(b"data")

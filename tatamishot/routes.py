@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from tatamishot.config import settings
@@ -24,10 +24,17 @@ from tatamishot.plex import (
 router = APIRouter()
 
 
+async def _require_plex_token(x_plex_token: str | None = Header(default=None)) -> str:
+    """Dependency that extracts and validates the X-Plex-Token header."""
+    if not x_plex_token:
+        raise HTTPException(status_code=401, detail="Not authenticated — provide X-Plex-Token header")
+    return x_plex_token
+
+
 @router.get("/session")
-async def get_session() -> JSONResponse:
+async def get_session(plex_token: str = Depends(_require_plex_token)) -> JSONResponse:
     """Return the currently active Plex session."""
-    plex_headers = {"X-Plex-Token": settings.plex_token, "Accept": "application/json"}
+    plex_headers = {"X-Plex-Token": plex_token, "Accept": "application/json"}
     no_cache = {"Cache-Control": "no-store"}
 
     async with httpx.AsyncClient() as client:

@@ -13,6 +13,7 @@ from starlette_context import context
 from starlette_context.middleware import RawContextMiddleware
 from starlette_context.plugins import CorrelationIdPlugin, RequestIdPlugin
 
+from tatamishot.auth import router as auth_router
 from tatamishot.config import settings
 from tatamishot.log import configure_logging
 from tatamishot.routes import router
@@ -46,5 +47,6 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 app = FastAPI(title="TatamiShot", lifespan=lifespan)
 app.add_middleware(LogContextMiddleware)
 app.add_middleware(RawContextMiddleware, plugins=[RequestIdPlugin(), CorrelationIdPlugin()])
+app.include_router(auth_router)
 app.include_router(router)
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
