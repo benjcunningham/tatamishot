@@ -384,6 +384,56 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.3; }
     }
+    /* Auth banner */
+    #auth-banner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      text-align: center;
+    }
+
+    #auth-banner.hidden { display: none; }
+
+    #auth-banner p {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    #auth-status { min-height: 1.2em; }
+
+    #plex-signin-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: var(--radius);
+      border: none;
+      background: var(--accent);
+      color: #000;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #plex-signin-btn:active { background: var(--accent-dim); }
+    #plex-signin-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+    #signout-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+
+    #signout-btn.hidden { display: none; }
+
   </style>
 </head>
 <body>
@@ -391,7 +441,14 @@
   <header>
     <div id="refresh-dot"></div>
     <h1>TatamiShot</h1>
+    <button id="signout-btn" class="hidden">Sign out</button>
   </header>
+
+  <div id="auth-banner" class="hidden">
+    <p>Sign in to your Plex account to use TatamiShot.</p>
+    <button id="plex-signin-btn">Sign in with Plex</button>
+    <p id="auth-status"></p>
+  </div>
 
   <div id="session-card" class="idle">
     <div class="title" id="session-title">Waiting for Plex…</div>
@@ -471,10 +528,15 @@
   let sessionBaseTs = null;     // session.timestamp at last successful Plex poll
   let userOffset = 0;           // seconds manually nudged by user
   let currentRatingKey = null;  // ratingKey of last seen title (resets offset on change)
+  let pinPollTimer = null;
 
   // -------------------------------------------------------------------------
   // DOM refs
   // -------------------------------------------------------------------------
+  const authBanner    = document.getElementById('auth-banner');
+  const plexSigninBtn = document.getElementById('plex-signin-btn');
+  const authStatus    = document.getElementById('auth-status');
+  const signoutBtn    = document.getElementById('signout-btn');
   const sessionCard  = document.getElementById('session-card');
   const sessionTitle = document.getElementById('session-title');
   const sessionYear  = document.getElementById('session-year');
@@ -504,6 +566,75 @@
   const outputMedia  = document.getElementById('output-media');
   const shareBtn     = document.getElementById('share-btn');
   const resetBtn     = document.getElementById('reset-btn');
+
+  // -------------------------------------------------------------------------
+  // Auth
+  // -------------------------------------------------------------------------
+  function getToken() { return localStorage.getItem('plexToken'); }
+  function storeToken(t) { localStorage.setItem('plexToken', t); }
+  function clearToken() { localStorage.removeItem('plexToken'); }
+
+  function showAuthBanner() {
+    authBanner.classList.remove('hidden');
+    signoutBtn.classList.add('hidden');
+    authStatus.textContent = '';
+    plexSigninBtn.disabled = false;
+  }
+
+  function hideAuthBanner() {
+    authBanner.classList.add('hidden');
+    signoutBtn.classList.remove('hidden');
+  }
+
+  async function startPlexLogin() {
+    plexSigninBtn.disabled = true;
+    authStatus.textContent = 'Requesting PIN…';
+
+    try {
+      const res = await fetch('/auth/pin', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { pin_id, auth_url } = await res.json();
+
+      authStatus.textContent = 'Opening Plex sign-in…';
+      window.open(auth_url, '_blank', 'width=800,height=700,noopener');
+      authStatus.textContent = 'Waiting for authorization…';
+
+      let elapsed = 0;
+      pinPollTimer = setInterval(async () => {
+        elapsed += 1500;
+        if (elapsed >= 4 * 60 * 1000) {
+          clearInterval(pinPollTimer);
+          plexSigninBtn.disabled = false;
+          authStatus.textContent = 'Sign-in timed out. Please try again.';
+          return;
+        }
+        try {
+          const pollRes = await fetch(`/auth/pin/${pin_id}`);
+          if (!pollRes.ok) return;
+          const { auth_token } = await pollRes.json();
+          if (auth_token) {
+            clearInterval(pinPollTimer);
+            storeToken(auth_token);
+            hideAuthBanner();
+            refreshSession();
+          }
+        } catch (_) { /* keep polling */ }
+      }, 1500);
+    } catch (e) {
+      plexSigninBtn.disabled = false;
+      authStatus.textContent = `Error: ${e.message}`;
+    }
+  }
+
+  plexSigninBtn.addEventListener('click', startPlexLogin);
+
+  signoutBtn.addEventListener('click', () => {
+    clearToken();
+    if (pinPollTimer) { clearInterval(pinPollTimer); pinPollTimer = null; }
+    session = null;
+    renderSession({ playing: false });
+    showAuthBanner();
+  });
 
   // -------------------------------------------------------------------------
   // Helpers
@@ -556,8 +687,11 @@
   // Session polling
   // -------------------------------------------------------------------------
   async function refreshSession() {
+    const token = getToken();
+    if (!token) { showAuthBanner(); return; }
     try {
-      const res = await fetch('/session');
+      const res = await fetch('/session', { headers: { 'X-Plex-Token': token } });
+      if (res.status === 401) { clearToken(); showAuthBanner(); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       session = data;
@@ -972,7 +1106,12 @@
   // -------------------------------------------------------------------------
   // Boot
   // -------------------------------------------------------------------------
-  refreshSession();
+  if (getToken()) {
+    hideAuthBanner();
+    refreshSession();
+  } else {
+    showAuthBanner();
+  }
   setInterval(refreshSession, 10000);
   setInterval(tickTimestamp, 1000);
 })();
