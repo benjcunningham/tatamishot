@@ -434,6 +434,101 @@
 
     #signout-btn.hidden { display: none; }
 
+    /* Trim panel */
+    #trim-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #trim-panel.visible { display: flex; }
+
+    #trim-tabs {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .trim-tab {
+      flex: 1;
+      padding: 10px;
+      background: var(--surface);
+      border: none;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .trim-tab.active { background: var(--border); color: var(--text); }
+    .trim-tab[data-tab="in"].active  { border-bottom: 2px solid #4a9eff; }
+    .trim-tab[data-tab="out"].active { border-bottom: 2px solid #ff4a4a; }
+
+    #trim-twoUp {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .trim-frame-wrap {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 2px solid transparent;
+    }
+
+    .trim-frame-wrap.border-in  { border-color: #4a9eff; }
+    .trim-frame-wrap.border-out { border-color: #ff4a4a; }
+
+    .trim-frame-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .trim-frame-badge {
+      position: absolute;
+      bottom: 3px; left: 3px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 3px;
+      font-size: 0.6rem;
+      color: #fff;
+      padding: 1px 4px;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+    }
+
+    #trim-nudge-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .trim-nudge-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.8rem;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .trim-nudge-btn:active { background: var(--border); }
+
+    #trim-frame-tc {
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      min-width: 80px;
+      text-align: center;
+    }
+
   </style>
 </head>
 <body>
@@ -495,6 +590,31 @@
     <button class="action-btn hidden" id="capture-clip-btn" disabled>Export Clip</button>
   </div>
 
+  <!-- Trim panel -->
+  <div id="trim-panel">
+    <div id="trim-twoUp">
+      <div class="trim-frame-wrap border-in" id="trim-frame-in-wrap">
+        <img id="trim-frame-in" alt="" />
+        <div class="trim-frame-badge" id="trim-frame-in-badge"></div>
+      </div>
+      <div class="trim-frame-wrap border-out" id="trim-frame-out-wrap">
+        <img id="trim-frame-out" alt="" />
+        <div class="trim-frame-badge" id="trim-frame-out-badge"></div>
+      </div>
+    </div>
+    <div id="trim-tabs">
+      <button class="trim-tab active" data-tab="in">Start frame</button>
+      <button class="trim-tab" data-tab="out">End frame</button>
+    </div>
+    <div id="trim-nudge-row">
+      <button class="trim-nudge-btn" data-nudge="-10">−10f</button>
+      <button class="trim-nudge-btn" data-nudge="-1">−1f</button>
+      <span id="trim-frame-tc"></span>
+      <button class="trim-nudge-btn" data-nudge="1">+1f</button>
+      <button class="trim-nudge-btn" data-nudge="10">+10f</button>
+    </div>
+  </div>
+
   <!-- Progress -->
   <div id="progress">
     <div class="spinner"></div>
@@ -529,6 +649,12 @@
   let userOffset = 0;           // seconds manually nudged by user
   let currentRatingKey = null;  // ratingKey of last seen title (resets offset on change)
   let pinPollTimer = null;
+  let fps = 24.0;
+  let sourceDuration = 0;
+  let activeTab = 'in';
+  let frameCache = new Map();
+  let twoUpController = null;
+  let twoUpDebounceTimer = null;
 
   // -------------------------------------------------------------------------
   // DOM refs
@@ -566,6 +692,15 @@
   const outputMedia  = document.getElementById('output-media');
   const shareBtn     = document.getElementById('share-btn');
   const resetBtn     = document.getElementById('reset-btn');
+
+  const trimPanel        = document.getElementById('trim-panel');
+  const trimTabs         = document.querySelectorAll('.trim-tab');
+  const trimFrameIn      = document.getElementById('trim-frame-in');
+  const trimFrameOut     = document.getElementById('trim-frame-out');
+  const trimFrameInBadge  = document.getElementById('trim-frame-in-badge');
+  const trimFrameOutBadge = document.getElementById('trim-frame-out-badge');
+  const trimFrameTc      = document.getElementById('trim-frame-tc');
+  const trimNudgeBtns    = document.querySelectorAll('.trim-nudge-btn');
 
   // -------------------------------------------------------------------------
   // Auth
@@ -776,13 +911,16 @@
         if (s.index === defaultIndex) opt.selected = true;
         selectEl.appendChild(opt);
       }
-      if (currentVal && burnableSubs.some(s => String(s.index) === currentVal)) {
+      if (currentVal === '' || (currentVal && burnableSubs.some(s => String(s.index) === currentVal))) {
         selectEl.value = currentVal;
       }
     }
 
     const subs = data.subtitle_streams ?? [];
     buildSubtitleSelect(subtitleTrackSelect, subtitleTrackRow, subs, data.subtitle_stream_index ?? null);
+
+    fps = data.fps ?? 24.0;
+    sourceDuration = data.duration ?? 0;
   }
 
   function tickTimestamp() {
@@ -847,6 +985,7 @@
       captureClipBtn.disabled = true;
       captureClipBtn.classList.add('hidden');
     }
+    updateTrimPanel();
   }
 
   function makeMarkEditable(displayEl, inputEl, getValue, setValue) {
@@ -915,7 +1054,6 @@
       if (ts != null) {
         markOut = ts;
         updateClipState();
-        if (markOut > markIn) captureClipBtn.click();
       }
     }
     pressStartTs = null;
@@ -1100,7 +1238,107 @@
     pressStartWall = null;
     captureBtn.classList.remove('recording');
     captureBtnLbl.textContent = 'Tap for Frame · Hold for Clip';
+    for (const url of frameCache.values()) URL.revokeObjectURL(url);
+    frameCache.clear();
     updateClipState();
+  });
+
+  // -------------------------------------------------------------------------
+  // Trim panel
+  // -------------------------------------------------------------------------
+  function snapToFrame(ts) {
+    return Math.round(ts * fps) / fps;
+  }
+
+  function fmtFrame(ts) {
+    return `f${Math.round(ts * fps)}`;
+  }
+
+  async function fetchFrameCached(filePath, ts) {
+    const key = `${filePath}:${ts.toFixed(4)}`;
+    if (frameCache.has(key)) return frameCache.get(key);
+    const token = getToken();
+    const res = await fetch('/frame', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Plex-Token': token },
+      body: JSON.stringify({ file_path: filePath, timestamp: ts }),
+    });
+    if (!res.ok) throw new Error(`frame fetch failed: ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    frameCache.set(key, url);
+    return url;
+  }
+
+  function updateTrimPanel() {
+    const hasClip = markIn !== null && markOut !== null && markOut > markIn;
+    trimPanel.classList.toggle('visible', hasClip);
+    if (!hasClip) return;
+    updateTrimFrameTc();
+    scheduleTwoUp();
+  }
+
+  function updateTrimFrameTc() {
+    const activeTs = activeTab === 'in' ? markIn : markOut;
+    if (activeTs !== null) trimFrameTc.textContent = fmtTime(activeTs);
+  }
+
+  function scheduleTwoUp() {
+    clearTimeout(twoUpDebounceTimer);
+    twoUpDebounceTimer = setTimeout(renderTwoUp, 1500);
+  }
+
+  function renderTwoUp() {
+    const fp = session?.file_path;
+    if (!fp || markIn === null || markOut === null) return;
+
+    trimFrameInBadge.textContent  = `${fmtTime(markIn)}  ${fmtFrame(markIn)}`;
+    trimFrameOutBadge.textContent = `${fmtTime(markOut)}  ${fmtFrame(markOut)}`;
+
+    if (twoUpController) twoUpController.abort();
+    twoUpController = new AbortController();
+    const signal = twoUpController.signal;
+
+    trimFrameIn.src  = '';
+    trimFrameOut.src = '';
+
+    (async () => {
+      try {
+        const inUrl = await fetchFrameCached(fp, markIn);
+        if (signal.aborted) return;
+        trimFrameIn.src = inUrl;
+        const outUrl = await fetchFrameCached(fp, markOut);
+        if (signal.aborted) return;
+        trimFrameOut.src = outUrl;
+      } catch (_) {}
+    })();
+  }
+
+  function nudgeActivePoint(frames) {
+    const delta = frames / fps;
+    if (activeTab === 'in') {
+      markIn = snapToFrame(Math.max(0, (markIn ?? 0) + delta));
+      if (markOut !== null && markIn >= markOut) markIn = snapToFrame(markOut - 1 / fps);
+    } else {
+      markOut = snapToFrame(Math.max(0, (markOut ?? 0) + delta));
+      const maxTs = sourceDuration > 0 ? sourceDuration : markOut + 1;
+      if (markOut > maxTs) markOut = snapToFrame(maxTs);
+      if (markIn !== null && markOut <= markIn) markOut = snapToFrame(markIn + 1 / fps);
+    }
+    updateClipState();
+  }
+
+  trimNudgeBtns.forEach(btn => {
+    btn.addEventListener('click', () => nudgeActivePoint(parseInt(btn.dataset.nudge, 10)));
+  });
+
+  trimTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      trimTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeTab = tab.dataset.tab;
+      updateTrimFrameTc();
+    });
   });
 
   // -------------------------------------------------------------------------

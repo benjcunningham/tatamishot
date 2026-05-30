@@ -74,3 +74,25 @@ def test_clip_422_when_file_missing(client: TestClient) -> None:
 def test_frame_422_when_file_missing(client: TestClient) -> None:
     resp = client.post("/frame", json={"file_path": "/nonexistent.mkv", "timestamp": 10.0})
     assert resp.status_code == 422
+
+
+def test_stream_401_without_token(client: TestClient, tmp_path: Path) -> None:
+    f = tmp_path / "movie.mkv"
+    f.write_bytes(b"data")
+    resp = client.get(f"/stream?file_path={f}")
+    assert resp.status_code == 401
+
+
+def test_stream_422_when_file_missing(client: TestClient) -> None:
+    resp = client.get("/stream?file_path=/nonexistent.mkv", headers={"X-Plex-Token": "tok"})
+    assert resp.status_code == 422
+
+
+def test_stream_accepts_token_as_query_param(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    f = tmp_path / "movie.mp4"
+    f.write_bytes(b"data")
+    monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir_host", "")
+    resp = client.get(f"/stream?file_path={f}&token=tok")
+    assert resp.status_code == 200

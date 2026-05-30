@@ -8,6 +8,7 @@ TEXT_SUBTITLE_CODECS = {"srt", "subrip", "ass", "ssa", "webvtt", "mov_text", "te
 
 class ParsedMedia(BaseModel):
     file_path: str | None = None
+    fps: float = 24.0
     audio_streams: list[dict[str, Any]] = Field(default_factory=list)
     audio_stream_index: int | None = None
     subtitle_streams: list[dict[str, Any]] = Field(default_factory=list)
@@ -62,7 +63,13 @@ def _parse_media_metadata(
             for stream in part.get("Stream", []):
                 stream_type = stream.get("streamType")
 
-                if stream_type == 2:
+                if stream_type == 1 and result.fps == 24.0:
+                    try:
+                        result.fps = float(stream.get("frameRate", 24.0))
+                    except (TypeError, ValueError):
+                        pass
+
+                elif stream_type == 2:
                     sid = str(stream.get("id", ""))
                     is_selected = sid in selected_audio_ids or bool(stream.get("selected"))
                     entry: dict[str, Any] = {
