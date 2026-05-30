@@ -1,11 +1,12 @@
 import asyncio
+import mimetypes
 import os
 import uuid
 from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 
 from tatamishot.config import settings
@@ -29,6 +30,17 @@ async def _require_plex_token(x_plex_token: str | None = Header(default=None)) -
     if not x_plex_token:
         raise HTTPException(status_code=401, detail="Not authenticated — provide X-Plex-Token header")
     return x_plex_token
+
+
+async def _token_from_header_or_query(
+    x_plex_token: str | None = Header(default=None),
+    token: str | None = Query(default=None),
+) -> str:
+    """Dependency accepting the Plex token from header or query param (needed for <video src=>)."""
+    value = x_plex_token or token
+    if not value:
+        raise HTTPException(status_code=401, detail="Not authenticated — provide X-Plex-Token header or token param")
+    return value
 
 
 @router.get("/session")
@@ -107,6 +119,7 @@ async def get_session(plex_token: str = Depends(_require_plex_token)) -> JSONRes
             "file_path": parsed.file_path,
             "timestamp": view_offset_ms / 1000,
             "duration": session.get("duration", 0) / 1000,
+            "fps": parsed.fps,
             "audio_streams": parsed.audio_streams,
             "audio_stream_index": parsed.audio_stream_index,
             "subtitle_streams": parsed.subtitle_streams,
@@ -221,3 +234,16 @@ async def download_output(job_id: str) -> FileResponse:
 
     media_type = "video/mp4" if filename.endswith(".mp4") else "image/jpeg"
     return FileResponse(str(out_path), media_type=media_type, filename=filename)
+
+
+@router.get("/stream")
+async def stream_file(
+    file_path: str = Query(...),
+    _token: str = Depends(_token_from_header_or_query),
+) -> FileResponse:
+    """Stream a source media file, supporting HTTP range requests for seeking."""
+    translated = _translate_path(file_path)
+    _validate_path(translated)
+    suffix = Path(translated).suffix.lower()
+    media_type = mimetypes.types_map.get(suffix, "application/octet-stream")
+    return FileResponse(translated, media_type=media_type)
