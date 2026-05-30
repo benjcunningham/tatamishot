@@ -1302,13 +1302,16 @@
     trimFrameIn.src  = '';
     trimFrameOut.src = '';
 
-    fetchFrameCached(fp, markIn).then(url => {
-      if (!signal.aborted) trimFrameIn.src = url;
-    }).catch(() => {});
-
-    fetchFrameCached(fp, markOut).then(url => {
-      if (!signal.aborted) trimFrameOut.src = url;
-    }).catch(() => {});
+    (async () => {
+      try {
+        const inUrl = await fetchFrameCached(fp, markIn);
+        if (signal.aborted) return;
+        trimFrameIn.src = inUrl;
+        const outUrl = await fetchFrameCached(fp, markOut);
+        if (signal.aborted) return;
+        trimFrameOut.src = outUrl;
+      } catch (_) {}
+    })();
   }
 
   function nudgeActivePoint(frames) {
