@@ -90,9 +90,10 @@ def test_run_clip_ffmpeg_binds_job_id(tmp_path: Path) -> None:
     out_path = tmp_path / f"{job_id}.mp4"
     req = ClipRequest(file_path="/fake/movie.mkv", start=0.0, end=5.0)
 
-    with patch("structlog.contextvars.bind_contextvars") as mock_bind, patch(
-        "tatamishot.ffmpeg.subprocess.run"
-    ) as mock_run:
+    with (
+        patch("structlog.contextvars.bind_contextvars") as mock_bind,
+        patch("tatamishot.ffmpeg.subprocess.run") as mock_run,
+    ):
         mock_run.return_value = MagicMock(returncode=1, stderr=b"error")
         _run_clip_ffmpeg(job_id, "/fake/movie.mkv", req, out_path)
 
