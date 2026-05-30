@@ -88,7 +88,9 @@ def test_stream_422_when_file_missing(client: TestClient) -> None:
     assert resp.status_code == 422
 
 
-def test_stream_accepts_token_as_query_param(client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_stream_accepts_token_as_query_param(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     f = tmp_path / "movie.mp4"
     f.write_bytes(b"data")
     monkeypatch.setattr("tatamishot.ffmpeg.settings.media_dir_host", "")

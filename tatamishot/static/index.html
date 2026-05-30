@@ -443,107 +443,6 @@
 
     #trim-panel.visible { display: flex; }
 
-    #trim-player-wrap {
-      position: relative;
-      background: #000;
-      border-radius: var(--radius);
-      overflow: hidden;
-      aspect-ratio: 16 / 9;
-    }
-
-    #trim-video {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      display: block;
-    }
-
-    #trim-video-error {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0.75);
-      color: var(--danger);
-      font-size: 0.8rem;
-      text-align: center;
-      padding: 12px;
-    }
-
-    #trim-video-error.hidden { display: none; }
-
-    .trim-overlay {
-      position: absolute;
-      background: rgba(0,0,0,0.6);
-      border-radius: 4px;
-      font-size: 0.7rem;
-      font-variant-numeric: tabular-nums;
-      color: #fff;
-      padding: 2px 6px;
-      pointer-events: none;
-    }
-
-    #trim-timecode { bottom: 8px; right: 8px; }
-    #trim-dur-badge { bottom: 8px; left: 8px; }
-
-    #trim-timeline-wrap { display: flex; flex-direction: column; gap: 6px; }
-
-    #trim-timeline {
-      position: relative;
-      height: 28px;
-      padding: 0 5px;
-    }
-
-    #trim-timeline-track {
-      position: relative;
-      height: 100%;
-      background: var(--border);
-      border-radius: 4px;
-    }
-
-    #trim-clip-region {
-      position: absolute;
-      top: 0; bottom: 0;
-      background: rgba(229,160,13,0.2);
-      border-top: 2px solid var(--accent);
-      border-bottom: 2px solid var(--accent);
-      pointer-events: none;
-    }
-
-    .trim-handle {
-      position: absolute;
-      top: -4px; bottom: -4px;
-      width: 10px;
-      border-radius: 3px;
-      cursor: ew-resize;
-      touch-action: none;
-      z-index: 2;
-      transform: translateX(-50%);
-    }
-
-    .trim-handle-in  { background: #4a9eff; }
-    .trim-handle-out { background: #ff4a4a; }
-
-    #trim-playhead {
-      position: absolute;
-      top: -4px; bottom: -4px;
-      width: 2px;
-      background: #fff;
-      pointer-events: none;
-      z-index: 1;
-      transform: translateX(-50%);
-    }
-
-    #trim-timeline-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.7rem;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-      padding: 0 5px;
-    }
-
     #trim-tabs {
       display: flex;
       border: 1px solid var(--border);
@@ -601,49 +500,6 @@
       padding: 1px 4px;
       font-variant-numeric: tabular-nums;
       pointer-events: none;
-    }
-
-    #trim-filmstrip {
-      display: flex;
-      gap: 3px;
-      overflow-x: auto;
-      padding: 2px 0;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-    }
-
-    .strip-thumb {
-      flex-shrink: 0;
-      width: 54px;
-      aspect-ratio: 16 / 9;
-      background: var(--border);
-      border-radius: 3px;
-      overflow: hidden;
-      border: 2px solid transparent;
-      cursor: pointer;
-      position: relative;
-    }
-
-    .strip-thumb.strip-active-in  { border-color: #4a9eff; }
-    .strip-thumb.strip-active-out { border-color: #ff4a4a; }
-
-    .strip-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-    .strip-spinner {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .strip-spinner::after {
-      content: '';
-      width: 10px; height: 10px;
-      border: 2px solid var(--muted);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
     }
 
     #trim-nudge-row {
@@ -736,50 +592,26 @@
 
   <!-- Trim panel -->
   <div id="trim-panel">
-    <div id="trim-player-wrap">
-      <video id="trim-video" playsinline></video>
-      <div id="trim-timecode" class="trim-overlay">0:00:00 / 0:00:00</div>
-      <div id="trim-dur-badge" class="trim-overlay">0s</div>
-      <div id="trim-video-error" class="hidden">⚠ This format may not play in browser.<br>You can still export.</div>
-    </div>
-    <div id="trim-timeline-wrap">
-      <div id="trim-timeline">
-        <div id="trim-timeline-track">
-          <div id="trim-clip-region"></div>
-          <div id="trim-handle-in"  class="trim-handle trim-handle-in"></div>
-          <div id="trim-handle-out" class="trim-handle trim-handle-out"></div>
-          <div id="trim-playhead"></div>
-        </div>
+    <div id="trim-twoUp">
+      <div class="trim-frame-wrap border-in" id="trim-frame-in-wrap">
+        <img id="trim-frame-in" alt="" />
+        <div class="trim-frame-badge" id="trim-frame-in-badge"></div>
       </div>
-      <div id="trim-timeline-labels">
-        <span id="trim-label-in"></span>
-        <span id="trim-label-dur"></span>
-        <span id="trim-label-out"></span>
+      <div class="trim-frame-wrap border-out" id="trim-frame-out-wrap">
+        <img id="trim-frame-out" alt="" />
+        <div class="trim-frame-badge" id="trim-frame-out-badge"></div>
       </div>
     </div>
-    <div id="trim-edit-panel">
-      <div id="trim-tabs">
-        <button class="trim-tab active" data-tab="in">Start frame</button>
-        <button class="trim-tab" data-tab="out">End frame</button>
-      </div>
-      <div id="trim-twoUp">
-        <div class="trim-frame-wrap" id="trim-frame-active-wrap">
-          <img id="trim-frame-active" alt="" />
-          <div class="trim-frame-badge" id="trim-frame-active-badge"></div>
-        </div>
-        <div class="trim-frame-wrap" id="trim-frame-ref-wrap">
-          <img id="trim-frame-ref" alt="" />
-          <div class="trim-frame-badge" id="trim-frame-ref-badge"></div>
-        </div>
-      </div>
-      <div id="trim-filmstrip"></div>
-      <div id="trim-nudge-row">
-        <button class="trim-nudge-btn" data-nudge="-10">−10f</button>
-        <button class="trim-nudge-btn" data-nudge="-1">−1f</button>
-        <span id="trim-frame-tc"></span>
-        <button class="trim-nudge-btn" data-nudge="1">+1f</button>
-        <button class="trim-nudge-btn" data-nudge="10">+10f</button>
-      </div>
+    <div id="trim-tabs">
+      <button class="trim-tab active" data-tab="in">Start frame</button>
+      <button class="trim-tab" data-tab="out">End frame</button>
+    </div>
+    <div id="trim-nudge-row">
+      <button class="trim-nudge-btn" data-nudge="-10">−10f</button>
+      <button class="trim-nudge-btn" data-nudge="-1">−1f</button>
+      <span id="trim-frame-tc"></span>
+      <button class="trim-nudge-btn" data-nudge="1">+1f</button>
+      <button class="trim-nudge-btn" data-nudge="10">+10f</button>
     </div>
   </div>
 
@@ -821,9 +653,8 @@
   let sourceDuration = 0;
   let activeTab = 'in';
   let frameCache = new Map();
-  let draggingHandle = null;
   let twoUpController = null;
-  let filmstripDebounceTimer = null;
+  let twoUpDebounceTimer = null;
 
   // -------------------------------------------------------------------------
   // DOM refs
@@ -863,26 +694,11 @@
   const resetBtn     = document.getElementById('reset-btn');
 
   const trimPanel        = document.getElementById('trim-panel');
-  const trimVideo        = document.getElementById('trim-video');
-  const trimTimecode     = document.getElementById('trim-timecode');
-  const trimDurBadge     = document.getElementById('trim-dur-badge');
-  const trimVideoError   = document.getElementById('trim-video-error');
-  const trimTimeline     = document.getElementById('trim-timeline-track');
-  const trimClipRegion   = document.getElementById('trim-clip-region');
-  const trimHandleIn     = document.getElementById('trim-handle-in');
-  const trimHandleOut    = document.getElementById('trim-handle-out');
-  const trimPlayhead     = document.getElementById('trim-playhead');
-  const trimLabelIn      = document.getElementById('trim-label-in');
-  const trimLabelDur     = document.getElementById('trim-label-dur');
-  const trimLabelOut     = document.getElementById('trim-label-out');
   const trimTabs         = document.querySelectorAll('.trim-tab');
-  const trimFrameActive  = document.getElementById('trim-frame-active');
-  const trimFrameRef     = document.getElementById('trim-frame-ref');
-  const trimFrameActiveWrap = document.getElementById('trim-frame-active-wrap');
-  const trimFrameRefWrap    = document.getElementById('trim-frame-ref-wrap');
-  const trimFrameActiveBadge = document.getElementById('trim-frame-active-badge');
-  const trimFrameRefBadge    = document.getElementById('trim-frame-ref-badge');
-  const trimFilmstrip    = document.getElementById('trim-filmstrip');
+  const trimFrameIn      = document.getElementById('trim-frame-in');
+  const trimFrameOut     = document.getElementById('trim-frame-out');
+  const trimFrameInBadge  = document.getElementById('trim-frame-in-badge');
+  const trimFrameOutBadge = document.getElementById('trim-frame-out-badge');
   const trimFrameTc      = document.getElementById('trim-frame-tc');
   const trimNudgeBtns    = document.querySelectorAll('.trim-nudge-btn');
 
@@ -1422,8 +1238,6 @@
     pressStartWall = null;
     captureBtn.classList.remove('recording');
     captureBtnLbl.textContent = 'Tap for Frame · Hold for Clip';
-    trimVideo.pause();
-    trimVideo.src = '';
     for (const url of frameCache.values()) URL.revokeObjectURL(url);
     frameCache.clear();
     updateClipState();
@@ -1460,116 +1274,41 @@
     const hasClip = markIn !== null && markOut !== null && markOut > markIn;
     trimPanel.classList.toggle('visible', hasClip);
     if (!hasClip) return;
-
-    const token = getToken();
-    const fp = session?.file_path;
-    if (!fp || !token) return;
-
-    const streamSrc = `/stream?file_path=${encodeURIComponent(fp)}&token=${encodeURIComponent(token)}`;
-    if (trimVideo.dataset.src !== streamSrc) {
-      trimVideo.dataset.src = streamSrc;
-      trimVideo.src = streamSrc;
-      trimVideo.load();
-    }
-
-    updateTimelineBar();
-    renderTwoUp();
-    scheduleFilmstripRender();
+    updateTrimFrameTc();
+    scheduleTwoUp();
   }
 
-  function updateTimelineBar() {
-    if (!sourceDuration || markIn === null || markOut === null) return;
-    const inPct  = (markIn  / sourceDuration) * 100;
-    const outPct = (markOut / sourceDuration) * 100;
-    trimClipRegion.style.left  = `${inPct}%`;
-    trimClipRegion.style.width = `${outPct - inPct}%`;
-    trimHandleIn.style.left    = `${inPct}%`;
-    trimHandleOut.style.left   = `${outPct}%`;
-    trimLabelIn.textContent    = fmtTime(markIn);
-    trimLabelOut.textContent   = fmtTime(markOut);
-    const dur = markOut - markIn;
-    trimLabelDur.textContent   = `${Math.round(dur)}s`;
+  function updateTrimFrameTc() {
     const activeTs = activeTab === 'in' ? markIn : markOut;
-    trimFrameTc.textContent    = fmtTime(activeTs);
+    if (activeTs !== null) trimFrameTc.textContent = fmtTime(activeTs);
+  }
+
+  function scheduleTwoUp() {
+    clearTimeout(twoUpDebounceTimer);
+    twoUpDebounceTimer = setTimeout(renderTwoUp, 1500);
   }
 
   function renderTwoUp() {
     const fp = session?.file_path;
     if (!fp || markIn === null || markOut === null) return;
 
-    const activeTs = activeTab === 'in' ? markIn : markOut;
-    const refTs    = activeTab === 'in' ? markOut : markIn;
+    trimFrameInBadge.textContent  = `${fmtTime(markIn)}  ${fmtFrame(markIn)}`;
+    trimFrameOutBadge.textContent = `${fmtTime(markOut)}  ${fmtFrame(markOut)}`;
 
-    trimFrameActiveWrap.className = `trim-frame-wrap trim-frame-active-${activeTab}`;
-    trimFrameActiveBadge.textContent = `${fmtTime(activeTs)}  ${fmtFrame(activeTs)}`;
-    trimFrameRefBadge.textContent    = `${fmtTime(refTs)}  ${fmtFrame(refTs)}`;
-
-    if (twoUpController) { twoUpController.abort(); }
+    if (twoUpController) twoUpController.abort();
     twoUpController = new AbortController();
     const signal = twoUpController.signal;
 
-    trimFrameActive.src = '';
-    trimFrameRef.src = '';
+    trimFrameIn.src  = '';
+    trimFrameOut.src = '';
 
-    fetchFrameCached(fp, activeTs).then(url => {
-      if (!signal.aborted) trimFrameActive.src = url;
+    fetchFrameCached(fp, markIn).then(url => {
+      if (!signal.aborted) trimFrameIn.src = url;
     }).catch(() => {});
 
-    fetchFrameCached(fp, refTs).then(url => {
-      if (!signal.aborted) trimFrameRef.src = url;
+    fetchFrameCached(fp, markOut).then(url => {
+      if (!signal.aborted) trimFrameOut.src = url;
     }).catch(() => {});
-  }
-
-  function scheduleFilmstripRender() {
-    clearTimeout(filmstripDebounceTimer);
-    filmstripDebounceTimer = setTimeout(renderFilmstrip, 200);
-  }
-
-  function renderFilmstrip() {
-    const fp = session?.file_path;
-    if (!fp || markIn === null || markOut === null) return;
-
-    const activeTs = activeTab === 'in' ? markIn : markOut;
-    const step = 4 / fps;
-    const window = 2;
-    const times = [];
-    for (let t = activeTs - window; t <= activeTs + window; t += step) {
-      const snapped = snapToFrame(Math.max(0, t));
-      times.push(snapped);
-    }
-
-    trimFilmstrip.innerHTML = '';
-    for (const t of times) {
-      const wrap = document.createElement('div');
-      wrap.className = 'trim-filmstrip-thumb';
-      if (Math.abs(t - activeTs) < 1 / (2 * fps)) wrap.classList.add('active');
-      wrap.dataset.ts = t;
-
-      const img = document.createElement('img');
-      img.alt = '';
-      wrap.appendChild(img);
-
-      const badge = document.createElement('div');
-      badge.className = 'trim-filmstrip-badge';
-      badge.textContent = fmtFrame(t);
-      wrap.appendChild(badge);
-
-      wrap.addEventListener('click', () => {
-        const snapped = snapToFrame(parseFloat(wrap.dataset.ts));
-        if (activeTab === 'in') markIn = snapped;
-        else markOut = snapped;
-        updateClipState();
-      });
-
-      trimFilmstrip.appendChild(wrap);
-
-      fetchFrameCached(fp, t).then(url => { img.src = url; }).catch(() => {});
-    }
-
-    const activeThumb = trimFilmstrip.querySelector('.trim-filmstrip-thumb.active');
-    if (activeThumb) {
-      setTimeout(() => activeThumb.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }), 50);
-    }
   }
 
   function nudgeActivePoint(frames) {
@@ -1595,86 +1334,9 @@
       trimTabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       activeTab = tab.dataset.tab;
-      updateTimelineBar();
-      renderTwoUp();
-      renderFilmstrip();
+      updateTrimFrameTc();
     });
   });
-
-  trimVideo.addEventListener('loadedmetadata', () => {
-    if (markIn !== null) trimVideo.currentTime = markIn;
-    trimVideo.play().catch(() => {});
-  });
-
-  trimVideo.addEventListener('timeupdate', () => {
-    if (markIn === null || markOut === null) return;
-    if (trimVideo.currentTime >= markOut || trimVideo.currentTime < markIn) {
-      trimVideo.currentTime = markIn;
-    }
-    const pos = trimVideo.currentTime;
-    const dur = trimVideo.duration || sourceDuration || 1;
-    trimTimecode.textContent = `${fmtTime(pos)} / ${fmtTime(dur)}`;
-    const clipDur = markOut - markIn;
-    trimDurBadge.textContent = `${Math.round(clipDur)}s`;
-    if (sourceDuration > 0) {
-      const pct = (pos / dur) * 100;
-      trimPlayhead.style.left = `${pct}%`;
-    }
-  });
-
-  trimVideo.addEventListener('error', () => {
-    trimVideoError.classList.remove('hidden');
-  });
-
-  trimVideo.addEventListener('loadstart', () => {
-    trimVideoError.classList.add('hidden');
-  });
-
-  function setupTimeline() {
-    function pctFromPointer(e) {
-      const rect = trimTimeline.getBoundingClientRect();
-      return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    }
-
-    function startHandleDrag(handle, getSet) {
-      handle.addEventListener('pointerdown', e => {
-        e.preventDefault();
-        handle.setPointerCapture(e.pointerId);
-        draggingHandle = handle;
-
-        function onMove(ev) {
-          if (!sourceDuration) return;
-          const pct = pctFromPointer(ev);
-          getSet(snapToFrame(pct * sourceDuration));
-          updateClipState();
-        }
-
-        function onUp() {
-          draggingHandle = null;
-          handle.removeEventListener('pointermove', onMove);
-          handle.removeEventListener('pointerup', onUp);
-        }
-
-        handle.addEventListener('pointermove', onMove);
-        handle.addEventListener('pointerup', onUp);
-      });
-    }
-
-    startHandleDrag(trimHandleIn, v => {
-      markIn = Math.min(v, markOut !== null ? snapToFrame(markOut - 1 / fps) : v);
-    });
-    startHandleDrag(trimHandleOut, v => {
-      markOut = Math.max(v, markIn !== null ? snapToFrame(markIn + 1 / fps) : v);
-    });
-
-    trimTimeline.addEventListener('click', e => {
-      if (draggingHandle) return;
-      if (!sourceDuration || !trimVideo.readyState) return;
-      const pct = pctFromPointer(e);
-      trimVideo.currentTime = pct * sourceDuration;
-    });
-  }
-  setupTimeline();
 
   // -------------------------------------------------------------------------
   // Boot
