@@ -28,7 +28,22 @@ jobs:
           PR=$(grep '^version' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
           echo "version=$PR" >> "$GITHUB_OUTPUT"
 
-      - name: Validate or auto-bump version
+      - name: Install Poetry
+        if: github.actor == 'dependabot[bot]'
+        run: pipx install poetry
+
+      - name: Auto-bump version for Dependabot
+        if: github.actor == 'dependabot[bot]'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          poetry version patch
+          git add pyproject.toml
+          git commit -m "chore: bump patch version"
+          git push
+
+      - name: Validate version bump
+        if: github.actor != 'dependabot[bot]'
         run: |
           BASE="${{ steps.base.outputs.version }}"
           PR="${{ steps.pr.outputs.version }}"
@@ -50,11 +65,11 @@ jobs:
           RESULT=$(compare_versions "$BASE" "$PR")
 
           if [ "$RESULT" = "decreased" ]; then
-            echo "Version decreased from $BASE to $PR — failing."
+            echo "Version decreased from $BASE to $PR - failing."
             exit 1
           elif [ "$RESULT" = "same" ]; then
-            echo "Version unchanged ($BASE), make sure to bump – failing."
+            echo "Version unchanged ($BASE), make sure to bump - failing."
             exit 1
           else
-            echo "Version bumped from $BASE to $PR — OK."
+            echo "Version bumped from $BASE to $PR - OK."
           fi

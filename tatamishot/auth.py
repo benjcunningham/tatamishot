@@ -36,12 +36,7 @@ async def create_pin() -> dict[str, str]:
     data = resp.json()
     pin_id = str(data["id"])
     code = data["code"]
-    auth_url = (
-        f"https://app.plex.tv/auth#?"
-        f"clientID={CLIENT_ID}"
-        f"&code={code}"
-        f"&context[device][product]=TatamiShot"
-    )
+    auth_url = f"https://app.plex.tv/auth#?clientID={CLIENT_ID}&code={code}&context[device][product]=TatamiShot"
 
     return {"pin_id": pin_id, "code": code, "auth_url": auth_url}
 

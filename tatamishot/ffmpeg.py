@@ -18,6 +18,15 @@ jobs: dict[str, dict[str, Any]] = {}
 TEXT_SUBTITLE_CODECS = {"srt", "subrip", "ass", "ssa", "webvtt", "mov_text", "text"}
 
 
+def _apply_result(job_id: str, result: subprocess.CompletedProcess, out_path: Path) -> None:
+    if result.returncode != 0:
+        jobs[job_id]["status"] = JobStatus.error
+        jobs[job_id]["error"] = result.stderr.decode(errors="replace")[-500:]
+    else:
+        jobs[job_id]["status"] = JobStatus.done
+        jobs[job_id]["filename"] = out_path.name
+
+
 def _translate_path(file_path: str) -> str:
     """Rewrite a host media path to its container mount point."""
     if settings.media_dir_host and file_path.startswith(settings.media_dir_host):
@@ -158,12 +167,7 @@ def _run_clip_ffmpeg(job_id: str, file_path: str, req: ClipRequest, out_path: Pa
 
     try:
         result = subprocess.run(cmd, capture_output=True, check=False)
-        if result.returncode != 0:
-            jobs[job_id]["status"] = JobStatus.error
-            jobs[job_id]["error"] = result.stderr.decode(errors="replace")[-500:]
-        else:
-            jobs[job_id]["status"] = JobStatus.done
-            jobs[job_id]["filename"] = out_path.name
+        _apply_result(job_id, result, out_path)
     finally:
         if srt_path:
             try:
