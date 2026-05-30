@@ -140,6 +140,8 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
 
     cmd = [
         "ffmpeg",
+        "-skip_frame",
+        "noref",
         "-ss",
         str(req.timestamp),
         "-i",
