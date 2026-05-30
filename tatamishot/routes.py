@@ -1,6 +1,5 @@
 import asyncio
 import mimetypes
-import os
 import uuid
 from pathlib import Path
 from typing import Any
@@ -10,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 from fastapi.responses import FileResponse, JSONResponse
 
 from tatamishot.config import settings
-from tatamishot.ffmpeg import _extract_shifted_srt, _run_clip_ffmpeg, _translate_path, _validate_path, jobs
+from tatamishot.ffmpeg import _run_clip_ffmpeg, _translate_path, _validate_path, jobs
 from tatamishot.log import log
 from tatamishot.models import ClipRequest, FrameRequest, JobStatus
 from tatamishot.plex import (
@@ -139,29 +138,20 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
     job_id = uuid.uuid4().hex
     out_path = Path(settings.output_dir) / f"{job_id}.jpg"
 
-    srt_path: str | None = None
-    if req.subtitle_stream_index is not None:
-        srt_path = _extract_shifted_srt(
-            file_path,
-            req.subtitle_stream_index,
-            req.subtitle_offset - req.timestamp,
-            extract_from=req.timestamp,
-            extract_to=req.timestamp + 1,
-        )
-
-    subtitle_filter = ["-vf", f"subtitles={srt_path}"] if srt_path else []
-
     cmd = [
         "ffmpeg",
         "-ss",
         str(req.timestamp),
         "-i",
         file_path,
-        *subtitle_filter,
         "-frames:v",
         "1",
+        "-vf",
+        "scale=640:-1",
+        "-sn",
+        "-an",
         "-q:v",
-        "2",
+        "5",
         "-y",
         str(out_path),
     ]
@@ -177,12 +167,6 @@ async def extract_frame(req: FrameRequest) -> FileResponse:
         _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
     except TimeoutError as exc:
         raise HTTPException(status_code=504, detail="ffmpeg timed out") from exc
-    finally:
-        if srt_path:
-            try:
-                os.unlink(srt_path)
-            except OSError:
-                pass
 
     if proc.returncode != 0:
         raise HTTPException(

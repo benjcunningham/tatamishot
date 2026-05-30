@@ -911,7 +911,7 @@
         if (s.index === defaultIndex) opt.selected = true;
         selectEl.appendChild(opt);
       }
-      if (currentVal && burnableSubs.some(s => String(s.index) === currentVal)) {
+      if (currentVal === '' || (currentVal && burnableSubs.some(s => String(s.index) === currentVal))) {
         selectEl.value = currentVal;
       }
     }
