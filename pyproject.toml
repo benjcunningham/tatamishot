@@ -48,7 +48,7 @@ ignore = [ "ANN401", "B008", "PLR2004", "PLR6301", "TC006",]
 [tool.poetry.dependencies]
 python = "^3.14"
 aiofiles = "^25.1.0"
-fastapi = "^0.136.1"
+fastapi = "^0.136.3"
 httpx = "^0.28.1"
 pydantic-settings = "^2.14.1"
 uvicorn = { extras = ["standard"], version = "^0.47.0"}
